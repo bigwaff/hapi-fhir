@@ -1,17 +1,17 @@
 package ca.uhn.fhir.to;
 
+import ca.uhn.fhir.to.mvc.AnnotationMethodHandlerAdapterConfigurer;
+import ca.uhn.fhir.to.util.WebUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
-import org.thymeleaf.spring4.SpringTemplateEngine;
-import org.thymeleaf.spring4.templateresolver.SpringResourceTemplateResolver;
-import org.thymeleaf.spring4.view.ThymeleafViewResolver;
+import org.thymeleaf.spring5.SpringTemplateEngine;
+import org.thymeleaf.spring5.templateresolver.SpringResourceTemplateResolver;
+import org.thymeleaf.spring5.view.ThymeleafViewResolver;
 import org.thymeleaf.templatemode.TemplateMode;
-
-import ca.uhn.fhir.to.mvc.AnnotationMethodHandlerAdapterConfigurer;
 
 @Configuration
 @EnableWebMvc
@@ -20,6 +20,15 @@ public class FhirTesterMvcConfig extends WebMvcConfigurerAdapter {
 
 	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry theRegistry) {
+		WebUtil.webJarAddBoostrap3(theRegistry);
+		WebUtil.webJarAddJQuery(theRegistry);
+		WebUtil.webJarAddFontAwesome(theRegistry);
+		WebUtil.webJarAddJSTZ(theRegistry);
+		WebUtil.webJarAddEonasdanBootstrapDatetimepicker(theRegistry);
+		WebUtil.webJarAddMomentJS(theRegistry);
+		WebUtil.webJarAddSelect2(theRegistry);
+		WebUtil.webJarAddAwesomeCheckbox(theRegistry);
+
 		theRegistry.addResourceHandler("/css/**").addResourceLocations("/css/");
 		theRegistry.addResourceHandler("/fa/**").addResourceLocations("/fa/");
 		theRegistry.addResourceHandler("/fonts/**").addResourceLocations("/fonts/");

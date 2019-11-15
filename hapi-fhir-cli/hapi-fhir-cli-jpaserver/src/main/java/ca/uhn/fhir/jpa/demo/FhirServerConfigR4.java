@@ -1,13 +1,32 @@
 package ca.uhn.fhir.jpa.demo;
 
-import java.util.Properties;
+/*-
+ * #%L
+ * HAPI FHIR - Command Line Client - Server WAR
+ * %%
+ * Copyright (C) 2014 - 2019 University Health Network
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
 
-import javax.persistence.EntityManagerFactory;
-import javax.sql.DataSource;
-
-import org.apache.commons.dbcp2.BasicDataSource;
+import ca.uhn.fhir.jpa.config.BaseJavaConfigR4;
+import ca.uhn.fhir.jpa.dao.DaoConfig;
+import ca.uhn.fhir.jpa.util.SubscriptionsRequireManualActivationInterceptorR4;
+import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor;
+import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
+import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
 import org.apache.commons.lang3.time.DateUtils;
-import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.springframework.beans.factory.annotation.Autowire;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -18,77 +37,47 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import ca.uhn.fhir.jpa.config.BaseJavaConfigR4;
-import ca.uhn.fhir.jpa.dao.DaoConfig;
-import ca.uhn.fhir.jpa.util.SubscriptionsRequireManualActivationInterceptorR4;
-import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor;
-import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
-import ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor;
+import javax.persistence.EntityManagerFactory;
+import javax.sql.DataSource;
+import java.util.Properties;
 
 /**
- * This class isn't used by default by the example, but 
+ * This class isn't used by default by the example, but
  * you can use it as a config if you want to support DSTU3
  * instead of DSTU2 in your server.
- * 
+ * <p>
  * See https://github.com/jamesagnew/hapi-fhir/issues/278
  */
 @Configuration
 @EnableTransactionManagement()
-@Import(FhirDbConfig.class)
+@Import(CommonConfig.class)
 public class FhirServerConfigR4 extends BaseJavaConfigR4 {
 
-	/**
-	 * Configure FHIR properties around the the JPA server via this bean
-	 */
-	@Bean()
-	public DaoConfig daoConfig() {
-		DaoConfig retVal = new DaoConfig();
-		retVal.setSubscriptionEnabled(true);
-		retVal.setSubscriptionPollDelay(5000);
-		retVal.setSubscriptionPurgeInactiveAfterMillis(DateUtils.MILLIS_PER_HOUR);
-		retVal.setAllowMultipleDelete(true);
-		return retVal;
-	}
+	@Autowired
+	private DataSource myDataSource;
+	@Autowired()
+	@Qualifier("jpaProperties")
+	private Properties myJpaProperties;
 
-	/**
-	 * The following bean configures the database connection. The 'url' property value of "jdbc:derby:directory:jpaserver_derby_files;create=true" indicates that the server should save resources in a
-	 * directory called "jpaserver_derby_files".
-	 * 
-	 * A URL to a remote database could also be placed here, along with login credentials and other properties supported by BasicDataSource.
-	 */
-	@Bean(destroyMethod = "close")
-	public DataSource dataSource() {
-		BasicDataSource retVal = new BasicDataSource();
-		retVal.setDriver(new org.apache.derby.jdbc.EmbeddedDriver());
-		retVal.setUrl("jdbc:derby:directory:target/jpaserver_derby_files;create=true");
-		retVal.setUsername("");
-		retVal.setPassword("");
-		return retVal;
-	}
-
-	@Bean()
+	@Override
+	@Bean
 	public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
-		LocalContainerEntityManagerFactoryBean retVal = new LocalContainerEntityManagerFactoryBean();
+		LocalContainerEntityManagerFactoryBean retVal = super.entityManagerFactory();
 		retVal.setPersistenceUnitName("HAPI_PU");
-		retVal.setDataSource(dataSource());
-		retVal.setPackagesToScan("ca.uhn.fhir.jpa.entity");
-		retVal.setPersistenceProvider(new HibernatePersistenceProvider());
+		retVal.setDataSource(myDataSource);
 		retVal.setJpaProperties(myJpaProperties);
 		return retVal;
 	}
 
-	@Autowired()
-	@Qualifier("jpaProperties")
-	private Properties myJpaProperties;
-	
 	/**
 	 * Do some fancy logging to create a nice access log that has details about each incoming request.
+	 * @return
 	 */
-	public IServerInterceptor loggingInterceptor() {
+	public LoggingInterceptor loggingInterceptor() {
 		LoggingInterceptor retVal = new LoggingInterceptor();
 		retVal.setLoggerName("fhirtest.access");
 		retVal.setMessageFormat(
-				"Path[${servletPath}] Source[${requestHeader.x-forwarded-for}] Operation[${operationType} ${operationName} ${idOrResourceName}] UA[${requestHeader.user-agent}] Params[${requestParameters}] ResponseEncoding[${responseEncodingNoDefault}]");
+			"Path[${servletPath}] Source[${requestHeader.x-forwarded-for}] Operation[${operationType} ${operationName} ${idOrResourceName}] UA[${requestHeader.user-agent}] Params[${requestParameters}] ResponseEncoding[${responseEncodingNoDefault}]");
 		retVal.setLogExceptions(true);
 		retVal.setErrorMessageFormat("ERROR - ${requestVerb} ${requestUrl}");
 		return retVal;
@@ -96,9 +85,10 @@ public class FhirServerConfigR4 extends BaseJavaConfigR4 {
 
 	/**
 	 * This interceptor adds some pretty syntax highlighting in responses when a browser is detected
+	 * @return
 	 */
 	@Bean(autowire = Autowire.BY_TYPE)
-	public IServerInterceptor responseHighlighterInterceptor() {
+	public ResponseHighlighterInterceptor responseHighlighterInterceptor() {
 		ResponseHighlighterInterceptor retVal = new ResponseHighlighterInterceptor();
 		return retVal;
 	}
@@ -109,7 +99,7 @@ public class FhirServerConfigR4 extends BaseJavaConfigR4 {
 		return retVal;
 	}
 
-	@Bean()
+	@Bean
 	public JpaTransactionManager transactionManager(EntityManagerFactory entityManagerFactory) {
 		JpaTransactionManager retVal = new JpaTransactionManager();
 		retVal.setEntityManagerFactory(entityManagerFactory);

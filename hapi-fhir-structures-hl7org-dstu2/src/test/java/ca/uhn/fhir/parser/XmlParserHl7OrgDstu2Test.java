@@ -11,28 +11,25 @@ import org.apache.commons.io.IOUtils;
 import org.hamcrest.core.IsNot;
 import org.hamcrest.core.StringContains;
 import org.hamcrest.text.StringContainsInOrder;
-import org.hl7.fhir.instance.model.*;
-import org.hl7.fhir.instance.model.Address.AddressUse;
-import org.hl7.fhir.instance.model.Address.AddressUseEnumFactory;
-import org.hl7.fhir.instance.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.instance.model.Enumeration;
-import org.hl7.fhir.instance.model.Enumerations.AdministrativeGender;
-import org.hl7.fhir.instance.model.Identifier.IdentifierUse;
-import org.hl7.fhir.instance.model.Narrative.NarrativeStatus;
-import org.hl7.fhir.instance.model.api.*;
-import org.junit.*;
-import org.hl7.fhir.instance.model.Observation;
-import org.hl7.fhir.instance.model.Organization;
-import org.hl7.fhir.instance.model.Patient;
-import org.hl7.fhir.instance.model.PrimitiveType;
-import org.hl7.fhir.instance.model.Reference;
-import org.hl7.fhir.instance.model.Resource;
-import org.hl7.fhir.instance.model.SimpleQuantity;
-import org.hl7.fhir.instance.model.Specimen;
-import org.hl7.fhir.instance.model.StringType;
+import org.hl7.fhir.dstu2.model.*;
+import org.hl7.fhir.dstu2.model.Address.AddressUse;
+import org.hl7.fhir.dstu2.model.Address.AddressUseEnumFactory;
+import org.hl7.fhir.dstu2.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.dstu2.model.Enumeration;
+import org.hl7.fhir.dstu2.model.Enumerations.AdministrativeGender;
+import org.hl7.fhir.dstu2.model.Identifier.IdentifierUse;
+import org.hl7.fhir.dstu2.model.Narrative.NarrativeStatus;
+import org.hl7.fhir.dstu2.model.Observation;
+import org.hl7.fhir.dstu2.model.Organization;
+import org.hl7.fhir.dstu2.model.Patient;
+import org.hl7.fhir.dstu2.model.PrimitiveType;
+import org.hl7.fhir.dstu2.model.Reference;
+import org.hl7.fhir.dstu2.model.Resource;
+import org.hl7.fhir.dstu2.model.SimpleQuantity;
+import org.hl7.fhir.dstu2.model.Specimen;
+import org.hl7.fhir.dstu2.model.StringType;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.hl7.fhir.instance.model.api.INarrative;
 import org.hl7.fhir.instance.model.api.IPrimitiveType;
 import org.junit.After;
 import org.junit.Assert;
@@ -49,7 +46,6 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.api.AddProfileTagEnum;
 import ca.uhn.fhir.model.api.annotation.Child;
 import ca.uhn.fhir.model.api.annotation.ResourceDef;
-import ca.uhn.fhir.narrative.INarrativeGenerator;
 import ca.uhn.fhir.parser.JsonParserHl7OrgDstu2Test.MyPatientWithOneDeclaredAddressExtension;
 import ca.uhn.fhir.parser.JsonParserHl7OrgDstu2Test.MyPatientWithOneDeclaredExtension;
 import ca.uhn.fhir.rest.api.Constants;
@@ -1050,7 +1046,7 @@ public class XmlParserHl7OrgDstu2Test {
     ourLog.info(encoded);
 
     assertThat(encoded, containsString("<Patient"));
-    assertThat(encoded, stringContainsInOrder("<tag>", "<system value=\"" + Constants.TAG_SUBSETTED_SYSTEM + "\"/>",
+    assertThat(encoded, stringContainsInOrder("<tag>", "<system value=\"" + Constants.TAG_SUBSETTED_SYSTEM_DSTU3 + "\"/>",
         "<code value=\"" + Constants.TAG_SUBSETTED_CODE + "\"/>", "</tag>"));
     assertThat(encoded, not(containsString("text")));
     assertThat(encoded, not(containsString("THE DIV")));
@@ -1169,7 +1165,7 @@ public class XmlParserHl7OrgDstu2Test {
     ourLog.info(encoded);
 
     assertThat(encoded, containsString("<Patient"));
-    assertThat(encoded, stringContainsInOrder("<tag>", "<system value=\"" + Constants.TAG_SUBSETTED_SYSTEM + "\"/>",
+    assertThat(encoded, stringContainsInOrder("<tag>", "<system value=\"" + Constants.TAG_SUBSETTED_SYSTEM_DSTU3 + "\"/>",
         "<code value=\"" + Constants.TAG_SUBSETTED_CODE + "\"/>", "</tag>"));
     assertThat(encoded, not(containsString("THE DIV")));
     assertThat(encoded, containsString("family"));
@@ -1191,7 +1187,7 @@ public class XmlParserHl7OrgDstu2Test {
 
     assertThat(encoded, containsString("<Patient"));
     assertThat(encoded, stringContainsInOrder("<tag>", "<system value=\"foo\"/>", "<code value=\"bar\"/>", "</tag>"));
-    assertThat(encoded, stringContainsInOrder("<tag>", "<system value=\"" + Constants.TAG_SUBSETTED_SYSTEM + "\"/>",
+    assertThat(encoded, stringContainsInOrder("<tag>", "<system value=\"" + Constants.TAG_SUBSETTED_SYSTEM_DSTU3 + "\"/>",
         "<code value=\"" + Constants.TAG_SUBSETTED_CODE + "\"/>", "</tag>"));
     assertThat(encoded, not(containsString("THE DIV")));
     assertThat(encoded, containsString("family"));
@@ -1502,37 +1498,6 @@ public class XmlParserHl7OrgDstu2Test {
         "<given value=\"Shmoe\"><extension url=\"http://examples.com#givenext_parent\"><extension url=\"http://examples.com#givenext_child\"><valueString value=\"CHILD\"/></extension></extension></given>"));
   }
 
-  // Narrative generation not currently supported for HL7org structures
-  public void testNarrativeGeneration() throws DataFormatException, IOException {
-
-    Patient patient = new Patient();
-    patient.addName().addFamily("Smith");
-    Organization org = new Organization();
-    patient.getManagingOrganization().setResource(org);
-
-    INarrativeGenerator gen = new INarrativeGenerator() {
-
-      @Override
-      public void generateNarrative(FhirContext theContext, IBaseResource theResource, INarrative theNarrative) {
-        try {
-          theNarrative.setDivAsString("<div>help</div>");
-        } catch (Exception e) {
-          throw new Error(e);
-        }
-        theNarrative.setStatusAsString("generated");
-      }
-
-    };
-
-    FhirContext context = ourCtx;
-    context.setNarrativeGenerator(gen);
-    IParser p = context.newXmlParser();
-    String str = p.encodeResourceToString(patient);
-
-    ourLog.info(str);
-
-    assertThat(str, StringContains.containsString(",\"text\":{\"status\":\"generated\",\"div\":\"<div>help</div>\"},"));
-  }
 
   @Test
   public void testNestedContainedResources() {
@@ -1593,7 +1558,7 @@ public class XmlParserHl7OrgDstu2Test {
     manifest.setType(cc);
     manifest.setMasterIdentifier(new Identifier().setSystem("mySystem").setValue(UUID.randomUUID().toString()));
     manifest.addContent().setP(new Reference(binary));
-    manifest.setStatus(org.hl7.fhir.instance.model.Enumerations.DocumentReferenceStatus.CURRENT);
+    manifest.setStatus(org.hl7.fhir.dstu2.model.Enumerations.DocumentReferenceStatus.CURRENT);
 
     String encoded = ourCtx.newXmlParser().setPrettyPrint(true).encodeResourceToString(manifest);
     ourLog.info(encoded);

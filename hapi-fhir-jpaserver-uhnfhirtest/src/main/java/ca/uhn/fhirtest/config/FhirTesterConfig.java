@@ -43,6 +43,11 @@ public class FhirTesterConfig {
 		TesterConfig retVal = new TesterConfig();
 		retVal
 			.addServer()
+				.withId("home_r4")
+				.withFhirVersion(FhirVersionEnum.R4)
+				.withBaseUrl("http://hapi.fhir.org/baseR4")
+				.withName("UHN/HAPI Server (R4 FHIR)")
+			.addServer()
 				.withId("home_21")
 				.withFhirVersion(FhirVersionEnum.DSTU3)
 				.withBaseUrl("http://hapi.fhir.org/baseDstu3")
@@ -53,10 +58,10 @@ public class FhirTesterConfig {
 				.withBaseUrl("http://hapi.fhir.org/baseDstu2")
 				.withName("UHN/HAPI Server (DSTU2 FHIR)")
 			.addServer()
-				.withId("home_r4")
-				.withFhirVersion(FhirVersionEnum.R4)
-				.withBaseUrl("http://hapi.fhir.org/baseR4")
-				.withName("UHN/HAPI Server (R4 FHIR)")
+				.withId("home_r5")
+				.withFhirVersion(FhirVersionEnum.R5)
+				.withBaseUrl("http://hapi.fhir.org/baseR5")
+				.withName("UHN/HAPI Server (R5 FHIR)")
 //			.addServer()
 //				.withId("tdl_d2")
 //				.withFhirVersion(FhirVersionEnum.DSTU2)
@@ -86,9 +91,9 @@ public class FhirTesterConfig {
 				.withName("Health Intersections (DSTU2 FHIR)")
 			.addServer()
 				.withId("spark2")
-				.withFhirVersion(FhirVersionEnum.DSTU2)
-				.withBaseUrl("http://spark-dstu2.furore.com/fhir")
-				.withName("Spark - Furore (DSTU2 FHIR)");
+				.withFhirVersion(FhirVersionEnum.DSTU3)
+				.withBaseUrl("http://vonk.fire.ly/")
+				.withName("Vonk - Firely (STU3 FHIR)");
 		
 		return retVal;
 	}

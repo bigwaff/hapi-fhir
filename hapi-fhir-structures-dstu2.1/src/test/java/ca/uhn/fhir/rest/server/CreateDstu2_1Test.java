@@ -23,18 +23,28 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.hl7.fhir.dstu2016may.model.*;
+import org.hl7.fhir.dstu2016may.model.DateType;
+import org.hl7.fhir.dstu2016may.model.IdType;
+import org.hl7.fhir.dstu2016may.model.OperationOutcome;
 import org.hl7.fhir.dstu2016may.model.OperationOutcome.OperationOutcomeIssueComponent;
+import org.hl7.fhir.dstu2016may.model.Patient;
 import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.rest.annotation.*;
+import ca.uhn.fhir.rest.annotation.Create;
+import ca.uhn.fhir.rest.annotation.IdParam;
+import ca.uhn.fhir.rest.annotation.Read;
+import ca.uhn.fhir.rest.annotation.ResourceParam;
+import ca.uhn.fhir.rest.annotation.Search;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.client.MyPatientWithExtensions;
-import ca.uhn.fhir.util.PortUtil;
+import ca.uhn.fhir.test.utilities.JettyUtil;
 import ca.uhn.fhir.util.TestUtil;
 
 public class CreateDstu2_1Test {
@@ -75,12 +85,13 @@ public class CreateDstu2_1Test {
 	}
 
 	@Test
-	public void testCreateReturnsOperationOutcome() throws Exception {
+	public void testCreateReturnsRepresentation() throws Exception {
 		ourReturnOo = new OperationOutcome().addIssue(new OperationOutcomeIssueComponent().setDiagnostics("DIAG"));
 		
 		HttpPost httpPost = new HttpPost("http://localhost:" + ourPort + "/Patient");
-		httpPost.setEntity(new StringEntity("{\"resourceType\":\"Patient\", \"status\":\"active\"}", ContentType.parse(Constants.CT_FHIR_JSON+"; charset=utf-8")));
+		httpPost.setEntity(new StringEntity("{\"resourceType\":\"Patient\", \"gender\":\"male\"}", ContentType.parse(Constants.CT_FHIR_JSON+"; charset=utf-8")));
 		HttpResponse status = ourClient.execute(httpPost);
+		String expectedContent = "{\"resourceType\":\"Patient\",\"id\":\"1\",\"gender\":\"male\"}";
 
 		String responseContent = IOUtils.toString(status.getEntity().getContent(), StandardCharsets.UTF_8);
 		IOUtils.closeQuietly(status.getEntity().getContent());
@@ -88,8 +99,8 @@ public class CreateDstu2_1Test {
 		ourLog.info("Response was:\n{}", responseContent);
 
 		assertEquals(201, status.getStatusLine().getStatusCode());
+		assertEquals(expectedContent, responseContent);
 
-		assertThat(responseContent, containsString("DIAG"));
 	}
 
 	/**
@@ -201,14 +212,13 @@ public class CreateDstu2_1Test {
 
 	@AfterClass
 	public static void afterClassClearContext() throws Exception {
-		ourServer.stop();
+		JettyUtil.closeServer(ourServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
 	@BeforeClass
 	public static void beforeClass() throws Exception {
-		ourPort = PortUtil.findFreePort();
-		ourServer = new Server(ourPort);
+		ourServer = new Server(0);
 
 		PatientProvider patientProvider = new PatientProvider();
 
@@ -219,7 +229,8 @@ public class CreateDstu2_1Test {
 		ServletHolder servletHolder = new ServletHolder(servlet);
 		proxyHandler.addServletWithMapping(servletHolder, "/*");
 		ourServer.setHandler(proxyHandler);
-		ourServer.start();
+		JettyUtil.startServer(ourServer);
+        ourPort = JettyUtil.getPortForStartedServer(ourServer);
 
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
 		HttpClientBuilder builder = HttpClientBuilder.create();
@@ -232,7 +243,9 @@ public class CreateDstu2_1Test {
 
 		@Create()
 		public MethodOutcome create(@ResourceParam Patient theIdParam) {
-			return new MethodOutcome(new IdType("Patient", "1"), true).setOperationOutcome(ourReturnOo);
+			theIdParam.setId("1");
+			return new MethodOutcome(new IdType("Patient", "1"), true).setOperationOutcome(ourReturnOo)
+					.setResource(theIdParam);
 		}
 
 		@Override

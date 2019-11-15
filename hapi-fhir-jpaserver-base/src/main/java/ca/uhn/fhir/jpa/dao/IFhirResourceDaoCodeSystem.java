@@ -1,19 +1,30 @@
 package ca.uhn.fhir.jpa.dao;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.context.support.IContextValidationSupport;
+import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.util.ParametersUtil;
+import org.hl7.fhir.instance.model.api.IBaseParameters;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.instance.model.api.IIdType;
+import org.hl7.fhir.instance.model.api.IPrimitiveType;
+import org.hl7.fhir.r4.model.codesystems.ConceptSubsumptionOutcome;
+
+import javax.annotation.Nonnull;
 import java.util.List;
 
 /*
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,80 +32,39 @@ import java.util.List;
  * limitations under the License.
  * #L%
  */
-import org.hl7.fhir.instance.model.api.*;
-
-import ca.uhn.fhir.rest.api.server.RequestDetails;
 
 public interface IFhirResourceDaoCodeSystem<T extends IBaseResource, CD, CC> extends IFhirResourceDao<T> {
 
-	List<IIdType> findCodeSystemIdsContainingSystemAndCode(String theCode, String theSystem);
+	List<IIdType> findCodeSystemIdsContainingSystemAndCode(String theCode, String theSystem, RequestDetails theRequest);
 
-	LookupCodeResult lookupCode(IPrimitiveType<String> theCode, IPrimitiveType<String> theSystem, CD theCoding, RequestDetails theRequestDetails);
+	@Nonnull
+	IContextValidationSupport.LookupCodeResult lookupCode(IPrimitiveType<String> theCode, IPrimitiveType<String> theSystem, CD theCoding, RequestDetails theRequestDetails);
 
-	public class LookupCodeResult {
-		private String myCodeDisplay;
-		private boolean myCodeIsAbstract;
-		private String myCodeSystemDisplayName;
-		private String myCodeSystemVersion;
-		private boolean myFound;
-		private String mySearchedForCode;
-		private String mySearchedForSystem;
+	SubsumesResult subsumes(IPrimitiveType<String> theCodeA, IPrimitiveType<String> theCodeB, IPrimitiveType<String> theSystem, CD theCodingA, CD theCodingB, RequestDetails theRequestDetails);
 
-		public String getCodeDisplay() {
-			return myCodeDisplay;
+	class SubsumesResult {
+
+		private final ConceptSubsumptionOutcome myOutcome;
+
+		public SubsumesResult(ConceptSubsumptionOutcome theOutcome) {
+			myOutcome = theOutcome;
 		}
 
-		public String getCodeSystemDisplayName() {
-			return myCodeSystemDisplayName;
+		public ConceptSubsumptionOutcome getOutcome() {
+			return myOutcome;
 		}
 
-		public String getCodeSystemVersion() {
-			return myCodeSystemVersion;
-		}
+		@SuppressWarnings("unchecked")
+		public IBaseParameters toParameters(FhirContext theFhirContext) {
+			IBaseParameters retVal = ParametersUtil.newInstance(theFhirContext);
 
-		public String getSearchedForCode() {
-			return mySearchedForCode;
-		}
+			IPrimitiveType<String> outcomeValue = (IPrimitiveType<String>) theFhirContext.getElementDefinition("code").newInstance();
+			outcomeValue.setValueAsString(getOutcome().toCode());
+			ParametersUtil.addParameterToParameters(theFhirContext, retVal, "outcome", outcomeValue);
 
-		public String getSearchedForSystem() {
-			return mySearchedForSystem;
-		}
-
-		public boolean isCodeIsAbstract() {
-			return myCodeIsAbstract;
-		}
-
-		public boolean isFound() {
-			return myFound;
-		}
-
-		public void setCodeDisplay(String theCodeDisplay) {
-			myCodeDisplay = theCodeDisplay;
-		}
-
-		public void setCodeIsAbstract(boolean theCodeIsAbstract) {
-			myCodeIsAbstract = theCodeIsAbstract;
-		}
-
-		public void setCodeSystemDisplayName(String theCodeSystemDisplayName) {
-			myCodeSystemDisplayName = theCodeSystemDisplayName;
-		}
-
-		public void setCodeSystemVersion(String theCodeSystemVersion) {
-			myCodeSystemVersion = theCodeSystemVersion;
-		}
-
-		public void setFound(boolean theFound) {
-			myFound = theFound;
-		}
-
-		public void setSearchedForCode(String theSearchedForCode) {
-			mySearchedForCode = theSearchedForCode;
-		}
-
-		public void setSearchedForSystem(String theSearchedForSystem) {
-			mySearchedForSystem = theSearchedForSystem;
+			return retVal;
 		}
 	}
+
 
 }

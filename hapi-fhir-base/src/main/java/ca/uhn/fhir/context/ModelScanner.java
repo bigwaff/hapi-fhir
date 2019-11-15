@@ -4,14 +4,14 @@ package ca.uhn.fhir.context;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,17 +19,6 @@ package ca.uhn.fhir.context;
  * limitations under the License.
  * #L%
  */
-import static org.apache.commons.lang3.StringUtils.isBlank;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.*;
-import java.util.*;
-import java.util.Map.Entry;
-
-import org.apache.commons.io.IOUtils;
-import org.hl7.fhir.instance.model.api.*;
 
 import ca.uhn.fhir.context.RuntimeSearchParam.RuntimeSearchParamStatusEnum;
 import ca.uhn.fhir.model.api.*;
@@ -38,86 +27,65 @@ import ca.uhn.fhir.model.primitive.BoundCodeDt;
 import ca.uhn.fhir.model.primitive.XhtmlDt;
 import ca.uhn.fhir.rest.api.RestSearchParameterTypeEnum;
 import ca.uhn.fhir.util.ReflectionUtil;
+import org.hl7.fhir.instance.model.api.*;
+
+import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.*;
+import java.util.Map.Entry;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 class ModelScanner {
 	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(ModelScanner.class);
 
-	private Map<Class<? extends IBase>, BaseRuntimeElementDefinition<?>> myClassToElementDefinitions = new HashMap<Class<? extends IBase>, BaseRuntimeElementDefinition<?>>();
+	private Map<Class<? extends IBase>, BaseRuntimeElementDefinition<?>> myClassToElementDefinitions = new HashMap<>();
 	private FhirContext myContext;
-	private Map<String, RuntimeResourceDefinition> myIdToResourceDefinition = new HashMap<String, RuntimeResourceDefinition>();
-	private Map<String, BaseRuntimeElementDefinition<?>> myNameToElementDefinitions = new HashMap<String, BaseRuntimeElementDefinition<?>>();
-	private Map<String, RuntimeResourceDefinition> myNameToResourceDefinitions = new HashMap<String, RuntimeResourceDefinition>();
-	private Map<String, Class<? extends IBaseResource>> myNameToResourceType = new HashMap<String, Class<? extends IBaseResource>>();
+	private Map<String, RuntimeResourceDefinition> myIdToResourceDefinition = new HashMap<>();
+	private Map<String, BaseRuntimeElementDefinition<?>> myNameToElementDefinitions = new HashMap<>();
+	private Map<String, RuntimeResourceDefinition> myNameToResourceDefinitions = new HashMap<>();
+	private Map<String, Class<? extends IBaseResource>> myNameToResourceType = new HashMap<>();
 	private RuntimeChildUndeclaredExtensionDefinition myRuntimeChildUndeclaredExtensionDefinition;
-	private Set<Class<? extends IBase>> myScanAlso = new HashSet<Class<? extends IBase>>();
+	private Set<Class<? extends IBase>> myScanAlso = new HashSet<>();
 	private FhirVersionEnum myVersion;
 
 	private Set<Class<? extends IBase>> myVersionTypes;
 
 	ModelScanner(FhirContext theContext, FhirVersionEnum theVersion, Map<Class<? extends IBase>, BaseRuntimeElementDefinition<?>> theExistingDefinitions,
-			Collection<Class<? extends IBase>> theResourceTypes) throws ConfigurationException {
+					 @Nonnull Collection<Class<? extends IBase>> theResourceTypes) throws ConfigurationException {
 		myContext = theContext;
 		myVersion = theVersion;
-		Set<Class<? extends IBase>> toScan;
-		if (theResourceTypes != null) {
-			toScan = new HashSet<Class<? extends IBase>>(theResourceTypes);
-		} else {
-			toScan = new HashSet<Class<? extends IBase>>();
-		}
+		Set<Class<? extends IBase>> toScan = new HashSet<>(theResourceTypes);
 		init(theExistingDefinitions, toScan);
 	}
 
-	static Class<?> determineElementType(Field next) {
-		Class<?> nextElementType = next.getType();
-		if (List.class.equals(nextElementType)) {
-			nextElementType = ReflectionUtil.getGenericCollectionTypeOfField(next);
-		} else if (Collection.class.isAssignableFrom(nextElementType)) {
-			throw new ConfigurationException("Field '" + next.getName() + "' in type '" + next.getClass().getCanonicalName() + "' is a Collection - Only java.util.List curently supported");
-		}
-		return nextElementType;
-	}
-
-	@SuppressWarnings("unchecked")
-	static IValueSetEnumBinder<Enum<?>> getBoundCodeBinder(Field theNext) {
-		Class<?> bound = getGenericCollectionTypeOfCodedField(theNext);
-		if (bound == null) {
-			throw new ConfigurationException("Field '" + theNext + "' has no parameter for " + BoundCodeDt.class.getSimpleName() + " to determine enum type");
-		}
-
-		String fieldName = "VALUESET_BINDER";
-		try {
-			Field bindingField = bound.getField(fieldName);
-			return (IValueSetEnumBinder<Enum<?>>) bindingField.get(null);
-		} catch (Exception e) {
-			throw new ConfigurationException("Field '" + theNext + "' has type parameter " + bound.getCanonicalName() + " but this class has no valueset binding field (must have a field called " + fieldName + ")", e);
-		}
-	}
-
-	public Map<Class<? extends IBase>, BaseRuntimeElementDefinition<?>> getClassToElementDefinitions() {
+	Map<Class<? extends IBase>, BaseRuntimeElementDefinition<?>> getClassToElementDefinitions() {
 		return myClassToElementDefinitions;
 	}
 
-	public Map<String, RuntimeResourceDefinition> getIdToResourceDefinition() {
+	Map<String, RuntimeResourceDefinition> getIdToResourceDefinition() {
 		return myIdToResourceDefinition;
 	}
 
-	public Map<String, BaseRuntimeElementDefinition<?>> getNameToElementDefinitions() {
+	Map<String, BaseRuntimeElementDefinition<?>> getNameToElementDefinitions() {
 		return myNameToElementDefinitions;
 	}
 
-	public Map<String, RuntimeResourceDefinition> getNameToResourceDefinition() {
+	Map<String, RuntimeResourceDefinition> getNameToResourceDefinition() {
 		return myNameToResourceDefinitions;
 	}
 
-	public Map<String, RuntimeResourceDefinition> getNameToResourceDefinitions() {
-		return (myNameToResourceDefinitions);
-	}
-
-	public Map<String, Class<? extends IBaseResource>> getNameToResourceType() {
+	Map<String, Class<? extends IBaseResource>> getNameToResourceType() {
 		return myNameToResourceType;
 	}
 
-	public RuntimeChildUndeclaredExtensionDefinition getRuntimeChildUndeclaredExtensionDefinition() {
+	RuntimeChildUndeclaredExtensionDefinition getRuntimeChildUndeclaredExtensionDefinition() {
 		return myRuntimeChildUndeclaredExtensionDefinition;
 	}
 
@@ -137,11 +105,7 @@ class ModelScanner {
 			for (Class<? extends IBase> nextClass : typesToScan) {
 				scan(nextClass);
 			}
-			for (Iterator<Class<? extends IBase>> iter = myScanAlso.iterator(); iter.hasNext();) {
-				if (myClassToElementDefinitions.containsKey(iter.next())) {
-					iter.remove();
-				}
-			}
+			myScanAlso.removeIf(theClass -> myClassToElementDefinitions.containsKey(theClass));
 			typesToScan.clear();
 			typesToScan.addAll(myScanAlso);
 			myScanAlso.clear();
@@ -152,7 +116,7 @@ class ModelScanner {
 				continue;
 			}
 			BaseRuntimeElementDefinition<?> next = nextEntry.getValue();
-			
+
 			boolean deferredSeal = false;
 			if (myContext.getPerformanceOptions().contains(PerformanceOptionsEnum.DEFERRED_MODEL_SCANNING)) {
 				if (next instanceof BaseRuntimeElementCompositeDefinition) {
@@ -173,21 +137,10 @@ class ModelScanner {
 	}
 
 	private boolean isStandardType(Class<? extends IBase> theClass) {
-		boolean retVal = myVersionTypes.contains(theClass);
-		return retVal;
+		return myVersionTypes.contains(theClass);
 	}
 
-	/**
-	 * There are two implementations of all of the annotations (e.g. {@link Child} and {@link org.hl7.fhir.instance.model.annotations.Child}) since the HL7.org ones will eventually replace the HAPI
-	 * ones. Annotations can't extend each other or implement interfaces or anything like that, so rather than duplicate all of the annotation processing code this method just creates an interface
-	 * Proxy to simulate the HAPI annotations if the HL7.org ones are found instead.
-	 */
-	static <T extends Annotation> T pullAnnotation(AnnotatedElement theTarget, Class<T> theAnnotationType) {
-		T retVal = theTarget.getAnnotation(theAnnotationType);
-		return retVal;
-	}
-
-	private void scan(Class<? extends IBase> theClass) throws ConfigurationException {
+	void scan(Class<? extends IBase> theClass) throws ConfigurationException {
 		BaseRuntimeElementDefinition<?> existingDef = myClassToElementDefinitions.get(theClass);
 		if (existingDef != null) {
 			return;
@@ -197,7 +150,7 @@ class ModelScanner {
 		if (resourceDefinition != null) {
 			if (!IBaseResource.class.isAssignableFrom(theClass)) {
 				throw new ConfigurationException(
-						"Resource type contains a @" + ResourceDef.class.getSimpleName() + " annotation but does not implement " + IResource.class.getCanonicalName() + ": " + theClass.getCanonicalName());
+					"Resource type contains a @" + ResourceDef.class.getSimpleName() + " annotation but does not implement " + IResource.class.getCanonicalName() + ": " + theClass.getCanonicalName());
 			}
 			@SuppressWarnings("unchecked")
 			Class<? extends IBaseResource> resClass = (Class<? extends IBaseResource>) theClass;
@@ -212,11 +165,11 @@ class ModelScanner {
 				Class<? extends ICompositeType> resClass = (Class<? extends ICompositeType>) theClass;
 				scanCompositeDatatype(resClass, datatypeDefinition);
 			} else if (IPrimitiveType.class.isAssignableFrom(theClass)) {
-				@SuppressWarnings({ "unchecked" })
+				@SuppressWarnings({"unchecked"})
 				Class<? extends IPrimitiveType<?>> resClass = (Class<? extends IPrimitiveType<?>>) theClass;
 				scanPrimitiveDatatype(resClass, datatypeDefinition);
-			} 
-				
+			}
+
 			return;
 		}
 
@@ -227,13 +180,13 @@ class ModelScanner {
 				scanBlock(theClass);
 			} else {
 				throw new ConfigurationException(
-						"Type contains a @" + Block.class.getSimpleName() + " annotation but does not implement " + IResourceBlock.class.getCanonicalName() + ": " + theClass.getCanonicalName());
+					"Type contains a @" + Block.class.getSimpleName() + " annotation but does not implement " + IResourceBlock.class.getCanonicalName() + ": " + theClass.getCanonicalName());
 			}
 		}
 
 		if (blockDefinition == null
 //Redundant	checking && datatypeDefinition == null && resourceDefinition == null
-				) {
+		) {
 			throw new ConfigurationException("Resource class[" + theClass.getName() + "] does not contain any valid HAPI-FHIR annotations");
 		}
 	}
@@ -242,11 +195,17 @@ class ModelScanner {
 		ourLog.debug("Scanning resource block class: {}", theClass.getName());
 
 		String resourceName = theClass.getCanonicalName();
-		if (isBlank(resourceName)) {
-			throw new ConfigurationException("Block type @" + Block.class.getSimpleName() + " annotation contains no name: " + theClass.getCanonicalName());
+
+		// Just in case someone messes up when upgrading from DSTU2
+		if (myContext.getVersion().getVersion().isEqualOrNewerThan(FhirVersionEnum.DSTU3)) {
+			if (BaseIdentifiableElement.class.isAssignableFrom(theClass)) {
+				throw new ConfigurationException("@Block class for version " + myContext.getVersion().getVersion().name() + " should not extend " + BaseIdentifiableElement.class.getSimpleName() + ": " + theClass.getName());
+			}
 		}
 
 		RuntimeResourceBlockDefinition blockDef = new RuntimeResourceBlockDefinition(resourceName, theClass, isStandardType(theClass), myContext, myClassToElementDefinitions);
+		blockDef.populateScanAlso(myScanAlso);
+
 		myClassToElementDefinitions.put(theClass, blockDef);
 	}
 
@@ -270,14 +229,6 @@ class ModelScanner {
 		 * sure that this type gets scanned as well
 		 */
 		elementDef.populateScanAlso(myScanAlso);
-	}
-
-
-
-	static Class<? extends Enum<?>> determineEnumTypeForBoundField(Field next) {
-		@SuppressWarnings("unchecked")
-		Class<? extends Enum<?>> enumType = (Class<? extends Enum<?>>) ReflectionUtil.getGenericCollectionTypeOfFieldWithSecondOrderForList(next);
-		return enumType;
 	}
 
 	private String scanPrimitiveDatatype(Class<? extends IPrimitiveType<?>> theClass, DatatypeDef theDatatypeDefinition) {
@@ -333,7 +284,7 @@ class ModelScanner {
 			}
 			if (isBlank(resourceName)) {
 				throw new ConfigurationException("Resource type @" + ResourceDef.class.getSimpleName() + " annotation contains no resource name(): " + theClass.getCanonicalName()
-						+ " - This is only allowed for types that extend other resource types ");
+					+ " - This is only allowed for types that extend other resource types ");
 			}
 		}
 
@@ -345,12 +296,12 @@ class ModelScanner {
 				primaryNameProvider = false;
 			}
 		}
-		
+
 		String resourceId = resourceDefinition.id();
 		if (!isBlank(resourceId)) {
 			if (myIdToResourceDefinition.containsKey(resourceId)) {
 				throw new ConfigurationException("The following resource types have the same ID of '" + resourceId + "' - " + theClass.getCanonicalName() + " and "
-						+ myIdToResourceDefinition.get(resourceId).getImplementingClass().getCanonicalName());
+					+ myIdToResourceDefinition.get(resourceId).getImplementingClass().getCanonicalName());
 			}
 		}
 
@@ -372,20 +323,20 @@ class ModelScanner {
 		 * sure that this type gets scanned as well
 		 */
 		resourceDef.populateScanAlso(myScanAlso);
-		
+
 		return resourceName;
 	}
 
 	private void scanResourceForSearchParams(Class<? extends IBaseResource> theClass, RuntimeResourceDefinition theResourceDef) {
 
-		Map<String, RuntimeSearchParam> nameToParam = new HashMap<String, RuntimeSearchParam>();
-		Map<Field, SearchParamDefinition> compositeFields = new LinkedHashMap<Field, SearchParamDefinition>();
+		Map<String, RuntimeSearchParam> nameToParam = new HashMap<>();
+		Map<Field, SearchParamDefinition> compositeFields = new LinkedHashMap<>();
 
 		/*
 		 * Make sure we pick up fields in interfaces too.. This ensures that we
 		 * grab the _id field which generally gets picked up via interface
 		 */
-		Set<Field> fields = new HashSet<Field>(Arrays.asList(theClass.getFields()));
+		Set<Field> fields = new HashSet<>(Arrays.asList(theClass.getFields()));
 		Class<?> nextClass = theClass;
 		do {
 			for (Class<?> nextInterface : nextClass.getInterfaces()) {
@@ -393,7 +344,7 @@ class ModelScanner {
 			}
 			nextClass = nextClass.getSuperclass();
 		} while (nextClass.equals(Object.class) == false);
-		
+
 		/*
 		 * Now scan the fields for search params
 		 */
@@ -404,8 +355,8 @@ class ModelScanner {
 				if (paramType == null) {
 					throw new ConfigurationException("Search param " + searchParam.name() + " has an invalid type: " + searchParam.type());
 				}
-				Set<String> providesMembershipInCompartments = null;
-				providesMembershipInCompartments = new HashSet<String>();
+				Set<String> providesMembershipInCompartments;
+				providesMembershipInCompartments = new HashSet<>();
 				for (Compartment next : searchParam.providesMembershipIn()) {
 					if (paramType != RestSearchParameterTypeEnum.REFERENCE) {
 						StringBuilder b = new StringBuilder();
@@ -420,14 +371,15 @@ class ModelScanner {
 					}
 					providesMembershipInCompartments.add(next.name());
 				}
-				
+
 				if (paramType == RestSearchParameterTypeEnum.COMPOSITE) {
 					compositeFields.put(nextField, searchParam);
 					continue;
 				}
 
 
-				RuntimeSearchParam param = new RuntimeSearchParam(searchParam.name(), searchParam.description(), searchParam.path(), paramType, providesMembershipInCompartments, toTargetList(searchParam.target()), RuntimeSearchParamStatusEnum.ACTIVE);
+				Collection<String> base = Collections.singletonList(theResourceDef.getName());
+				RuntimeSearchParam param = new RuntimeSearchParam(null, null, searchParam.name(), searchParam.description(), searchParam.path(), paramType, null, providesMembershipInCompartments, toTargetList(searchParam.target()), RuntimeSearchParamStatusEnum.ACTIVE, base);
 				theResourceDef.addSearchParam(param);
 				nameToParam.put(param.getName(), param);
 			}
@@ -436,12 +388,12 @@ class ModelScanner {
 		for (Entry<Field, SearchParamDefinition> nextEntry : compositeFields.entrySet()) {
 			SearchParamDefinition searchParam = nextEntry.getValue();
 
-			List<RuntimeSearchParam> compositeOf = new ArrayList<RuntimeSearchParam>();
+			List<RuntimeSearchParam> compositeOf = new ArrayList<>();
 			for (String nextName : searchParam.compositeOf()) {
 				RuntimeSearchParam param = nameToParam.get(nextName);
 				if (param == null) {
 					ourLog.warn("Search parameter {}.{} declares that it is a composite with compositeOf value '{}' but that is not a valid parametr name itself. Valid values are: {}",
-							new Object[] { theResourceDef.getName(), searchParam.name(), nextName, nameToParam.keySet() });
+						theResourceDef.getName(), searchParam.name(), nextName, nameToParam.keySet());
 					continue;
 				}
 				compositeOf.add(param);
@@ -453,16 +405,58 @@ class ModelScanner {
 	}
 
 	private Set<String> toTargetList(Class<? extends IBaseResource>[] theTarget) {
-		HashSet<String> retVal = new HashSet<String>();
-		
+		HashSet<String> retVal = new HashSet<>();
+
 		for (Class<? extends IBaseResource> nextType : theTarget) {
 			ResourceDef resourceDef = nextType.getAnnotation(ResourceDef.class);
 			if (resourceDef != null) {
 				retVal.add(resourceDef.name());
 			}
 		}
-		
+
 		return retVal;
+	}
+
+	static Class<?> determineElementType(Field next) {
+		Class<?> nextElementType = next.getType();
+		if (List.class.equals(nextElementType)) {
+			nextElementType = ReflectionUtil.getGenericCollectionTypeOfField(next);
+		} else if (Collection.class.isAssignableFrom(nextElementType)) {
+			throw new ConfigurationException("Field '" + next.getName() + "' in type '" + next.getClass().getCanonicalName() + "' is a Collection - Only java.util.List curently supported");
+		}
+		return nextElementType;
+	}
+
+	@SuppressWarnings("unchecked")
+	static IValueSetEnumBinder<Enum<?>> getBoundCodeBinder(Field theNext) {
+		Class<?> bound = getGenericCollectionTypeOfCodedField(theNext);
+		if (bound == null) {
+			throw new ConfigurationException("Field '" + theNext + "' has no parameter for " + BoundCodeDt.class.getSimpleName() + " to determine enum type");
+		}
+
+		String fieldName = "VALUESET_BINDER";
+		try {
+			Field bindingField = bound.getField(fieldName);
+			return (IValueSetEnumBinder<Enum<?>>) bindingField.get(null);
+		} catch (Exception e) {
+			throw new ConfigurationException("Field '" + theNext + "' has type parameter " + bound.getCanonicalName() + " but this class has no valueset binding field (must have a field called " + fieldName + ")", e);
+		}
+	}
+
+	/**
+	 * There are two implementations of all of the annotations (e.g. {@link Child} since the HL7.org ones will eventually replace the HAPI
+	 * ones. Annotations can't extend each other or implement interfaces or anything like that, so rather than duplicate all of the annotation processing code this method just creates an interface
+	 * Proxy to simulate the HAPI annotations if the HL7.org ones are found instead.
+	 */
+	static <T extends Annotation> T pullAnnotation(AnnotatedElement theTarget, Class<T> theAnnotationType) {
+		T retVal = theTarget.getAnnotation(theAnnotationType);
+		return retVal;
+	}
+
+	static Class<? extends Enum<?>> determineEnumTypeForBoundField(Field next) {
+		@SuppressWarnings("unchecked")
+		Class<? extends Enum<?>> enumType = (Class<? extends Enum<?>>) ReflectionUtil.getGenericCollectionTypeOfFieldWithSecondOrderForList(next);
+		return enumType;
 	}
 
 	private static Class<?> getGenericCollectionTypeOfCodedField(Field next) {
@@ -480,11 +474,10 @@ class ModelScanner {
 	}
 
 	static Set<Class<? extends IBase>> scanVersionPropertyFile(Set<Class<? extends IBase>> theDatatypes, Map<String, Class<? extends IBaseResource>> theResourceTypes, FhirVersionEnum theVersion, Map<Class<? extends IBase>, BaseRuntimeElementDefinition<?>> theExistingElementDefinitions) {
-		Set<Class<? extends IBase>> retVal = new HashSet<Class<? extends IBase>>();
+		Set<Class<? extends IBase>> retVal = new HashSet<>();
 
-		InputStream str = theVersion.getVersionImplementation().getFhirVersionPropertiesFile();
-		Properties prop = new Properties();
-		try {
+		try (InputStream str = theVersion.getVersionImplementation().getFhirVersionPropertiesFile()) {
+			Properties prop = new Properties();
 			prop.load(str);
 			for (Entry<Object, Object> nextEntry : prop.entrySet()) {
 				String nextKey = nextEntry.getKey().toString();
@@ -542,8 +535,6 @@ class ModelScanner {
 			}
 		} catch (IOException e) {
 			throw new ConfigurationException("Failed to load model property file from classpath: " + "/ca/uhn/fhir/model/dstu/model.properties");
-		} finally {
-			IOUtils.closeQuietly(str);
 		}
 
 		return retVal;

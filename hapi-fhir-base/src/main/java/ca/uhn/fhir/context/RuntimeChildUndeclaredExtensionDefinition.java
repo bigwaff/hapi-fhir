@@ -4,14 +4,14 @@ package ca.uhn.fhir.context;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang3.text.WordUtils;
+import org.apache.commons.text.WordUtils;
 import org.hl7.fhir.instance.model.api.IBase;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
@@ -68,7 +68,7 @@ public class RuntimeChildUndeclaredExtensionDefinition extends BaseRuntimeChildD
 	public IAccessor getAccessor() {
 		return new IAccessor() {
 			@Override
-			public List<IBase> getValues(Object theTarget) {
+			public List<IBase> getValues(IBase theTarget) {
 				ExtensionDt target = (ExtensionDt) theTarget;
 				if (target.getValue() != null) {
 					return Collections.singletonList((IBase) target.getValue());
@@ -76,6 +76,7 @@ public class RuntimeChildUndeclaredExtensionDefinition extends BaseRuntimeChildD
 				ArrayList<IBase> retVal = new ArrayList<IBase>(target.getUndeclaredExtensions());
 				return retVal;
 			}
+
 		};
 	}
 
@@ -113,7 +114,7 @@ public class RuntimeChildUndeclaredExtensionDefinition extends BaseRuntimeChildD
 	public IMutator getMutator() {
 		return new IMutator() {
 			@Override
-			public void addValue(Object theTarget, IBase theValue) {
+			public void addValue(IBase theTarget, IBase theValue) {
 				ExtensionDt target = (ExtensionDt) theTarget;
 				if (theValue instanceof IDatatype) {
 					target.setValue((IDatatype) theTarget);
@@ -123,7 +124,7 @@ public class RuntimeChildUndeclaredExtensionDefinition extends BaseRuntimeChildD
 			}
 
 			@Override
-			public void setValue(Object theTarget, IBase theValue) {
+			public void setValue(IBase theTarget, IBase theValue) {
 				ExtensionDt target = (ExtensionDt) theTarget;
 				if (theValue instanceof IDatatype) {
 					target.setValue((IDatatype) theTarget);
@@ -149,9 +150,9 @@ public class RuntimeChildUndeclaredExtensionDefinition extends BaseRuntimeChildD
 	
 	@Override
 	void sealAndInitialize(FhirContext theContext, Map<Class<? extends IBase>, BaseRuntimeElementDefinition<?>> theClassToElementDefinitions) {
-		Map<String, BaseRuntimeElementDefinition<?>> datatypeAttributeNameToDefinition = new HashMap<String, BaseRuntimeElementDefinition<?>>();
-		myDatatypeToAttributeName = new HashMap<Class<? extends IBase>, String>();
-		myDatatypeToDefinition = new HashMap<Class<? extends IBase>, BaseRuntimeElementDefinition<?>>();
+		Map<String, BaseRuntimeElementDefinition<?>> datatypeAttributeNameToDefinition = new HashMap<>();
+		myDatatypeToAttributeName = new HashMap<>();
+		myDatatypeToDefinition = new HashMap<>();
 
 		for (BaseRuntimeElementDefinition<?> next : theClassToElementDefinitions.values()) {
 			if (next instanceof IRuntimeDatatypeDefinition) {

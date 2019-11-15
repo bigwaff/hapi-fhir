@@ -5,14 +5,14 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,6 +39,8 @@ import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.param.ParameterUtil;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 
+import javax.annotation.Nonnull;
+
 public class UpdateMethodBinding extends BaseOutcomeReturningMethodBindingWithResourceParam {
 
 	public UpdateMethodBinding(Method theMethod, FhirContext theContext, Object theProvider) {
@@ -47,38 +49,13 @@ public class UpdateMethodBinding extends BaseOutcomeReturningMethodBindingWithRe
 
 	@Override
 	protected void addParametersForServerRequest(RequestDetails theRequest, Object[] theParams) {
-		/*
-		 * We are being a bit lenient here, since technically the client is supposed to include the version in the
-		 * Content-Location header, but we allow it in the PUT URL as well..
-		 */
-		String locationHeader = theRequest.getHeader(Constants.HEADER_CONTENT_LOCATION);
 		IIdType id = theRequest.getId();
-		if (isNotBlank(locationHeader)) {
-			id.setValue(locationHeader);
-			if (isNotBlank(id.getResourceType())) {
-				if (!getResourceName().equals(id.getResourceType())) {
-					throw new InvalidRequestException(
-							"Attempting to update '" + getResourceName() + "' but content-location header specifies different resource type '" + id.getResourceType() + "' - header value: " + locationHeader);
-				}
-			}
-		}
-
 		id = applyETagAsVersion(theRequest, id);
-
 		if (theRequest.getId() != null && theRequest.getId().hasVersionIdPart() == false) {
 			if (id != null && id.hasVersionIdPart()) {
 				theRequest.getId().setValue(id.getValue());
 			}
 		}
-
-		if (isNotBlank(locationHeader)) {
-			MethodOutcome mo = new MethodOutcome();
-			parseContentLocation(getContext(), mo, locationHeader);
-			if (mo.getId() == null || mo.getId().isEmpty()) {
-				throw new InvalidRequestException("Invalid Content-Location header for resource " + getResourceName() + ": " + locationHeader);
-			}
-		}
-
 		super.addParametersForServerRequest(theRequest, theParams);
 	}
 
@@ -98,6 +75,7 @@ public class UpdateMethodBinding extends BaseOutcomeReturningMethodBindingWithRe
 		return null;
 	}
 
+	@Nonnull
 	@Override
 	public RestOperationTypeEnum getRestOperationType() {
 		return RestOperationTypeEnum.UPDATE;

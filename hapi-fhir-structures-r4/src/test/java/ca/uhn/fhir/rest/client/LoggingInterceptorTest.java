@@ -1,15 +1,20 @@
 package ca.uhn.fhir.rest.client;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.mockito.Matchers.argThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.net.URL;
-
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.annotation.IdParam;
+import ca.uhn.fhir.rest.annotation.Read;
+import ca.uhn.fhir.rest.api.EncodingEnum;
+import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
+import ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor;
+import ca.uhn.fhir.rest.server.IResourceProvider;
+import ca.uhn.fhir.rest.server.RestfulServer;
+import ca.uhn.fhir.util.TestUtil;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.joran.JoranConfigurator;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.Appender;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -19,22 +24,13 @@ import org.junit.*;
 import org.mockito.ArgumentMatcher;
 import org.slf4j.LoggerFactory;
 
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.rest.annotation.IdParam;
-import ca.uhn.fhir.rest.annotation.Read;
-import ca.uhn.fhir.rest.client.api.IGenericClient;
-import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
-import ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor;
-import ca.uhn.fhir.rest.server.IResourceProvider;
-import ca.uhn.fhir.rest.server.RestfulServer;
-import ca.uhn.fhir.util.PortUtil;
-import ca.uhn.fhir.util.TestUtil;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.joran.JoranConfigurator;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.classic.spi.LoggingEvent;
-import ch.qos.logback.core.Appender;
+import java.net.URL;
+
+import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.*;
+
+import ca.uhn.fhir.test.utilities.JettyUtil;
 
 public class LoggingInterceptorTest {
 
@@ -66,7 +62,7 @@ public class LoggingInterceptorTest {
 	}
 
 	@Test
-	public void testLoggerNonVerbose() throws Exception {
+	public void testLoggerNonVerbose() {
 		System.out.println("Starting testLogger");
 		IGenericClient client = ourCtx.newRestfulGenericClient("http://localhost:" + ourPort);
 		ourCtx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
@@ -78,20 +74,20 @@ public class LoggingInterceptorTest {
 
 		verify(myMockAppender, times(2)).doAppend(argThat(new ArgumentMatcher<ILoggingEvent>() {
 			@Override
-			public boolean matches(final Object argument) {
-				String formattedMessage = ((LoggingEvent) argument).getFormattedMessage();
+			public boolean matches(final ILoggingEvent argument) {
+				String formattedMessage = argument.getFormattedMessage();
 				System.out.flush();
 				System.out.println("** Got Message: " + formattedMessage);
 				System.out.flush();
 				return
 					formattedMessage.contains("Client request: GET http://localhost:" + ourPort + "/Patient/1 HTTP/1.1") ||
-					formattedMessage.contains("Client response: HTTP 200 OK (Patient/1/_history/1)");
+					formattedMessage.contains("Client response: HTTP 200 OK (Patient/1/_history/1) in ");
 			}
 		}));
 	}
 
 		@Test
-	public void testLoggerVerbose() throws Exception {
+	public void testLoggerVerbose() {
 		System.out.println("Starting testLogger");
 		IGenericClient client = ourCtx.newRestfulGenericClient("http://localhost:" + ourPort);
 		ourCtx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
@@ -103,8 +99,8 @@ public class LoggingInterceptorTest {
 
 		verify(myMockAppender, times(1)).doAppend(argThat(new ArgumentMatcher<ILoggingEvent>() {
 			@Override
-			public boolean matches(final Object argument) {
-				String formattedMessage = ((LoggingEvent) argument).getFormattedMessage();
+			public boolean matches(final ILoggingEvent argument) {
+				String formattedMessage = argument.getFormattedMessage();
 				System.out.println("Verifying: " + formattedMessage);
 				return formattedMessage.replace("; ", ";").toLowerCase().contains("Content-Type: application/fhir+xml;charset=utf-8".toLowerCase());
 			}
@@ -118,8 +114,8 @@ public class LoggingInterceptorTest {
 
 		verify(myMockAppender, times(1)).doAppend(argThat(new ArgumentMatcher<ILoggingEvent>() {
 			@Override
-			public boolean matches(final Object argument) {
-				String formattedMessage = ((LoggingEvent) argument).getFormattedMessage();
+			public boolean matches(final ILoggingEvent argument) {
+				String formattedMessage = argument.getFormattedMessage();
 				System.out.println("Verifying: " + formattedMessage);
 				return formattedMessage.replace("; ", ";").toLowerCase().contains("Content-Type: application/fhir+xml;charset=utf-8".toLowerCase());
 			}
@@ -129,7 +125,7 @@ public class LoggingInterceptorTest {
 
 	@AfterClass
 	public static void afterClassClearContext() throws Exception {
-		ourServer.stop();
+		JettyUtil.closeServer(ourServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
@@ -144,18 +140,19 @@ public class LoggingInterceptorTest {
 		context.reset();
 		configurator.doConfigure(conf);
 
-		ourPort = PortUtil.findFreePort();
-		ourServer = new Server(ourPort);
+		ourServer = new Server(0);
 
 		DummyProvider patientProvider = new DummyProvider();
 
 		ServletHandler proxyHandler = new ServletHandler();
 		RestfulServer servlet = new RestfulServer(ourCtx);
+		servlet.setDefaultResponseEncoding(EncodingEnum.XML);
 		servlet.setResourceProviders(patientProvider);
 		ServletHolder servletHolder = new ServletHolder(servlet);
 		proxyHandler.addServletWithMapping(servletHolder, "/*");
 		ourServer.setHandler(proxyHandler);
-		ourServer.start();
+		JettyUtil.startServer(ourServer);
+        ourPort = JettyUtil.getPortForStartedServer(ourServer);
 
 		ourCtx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
 	}

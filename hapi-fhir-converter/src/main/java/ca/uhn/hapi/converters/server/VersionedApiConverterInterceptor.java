@@ -4,14 +4,14 @@ package ca.uhn.hapi.converters.server;
  * #%L
  * HAPI FHIR - Converter
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,6 +29,8 @@ import ca.uhn.fhir.rest.api.server.ResponseDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.interceptor.InterceptorAdapter;
+import org.hl7.fhir.converter.NullVersionConverterAdvisor30;
+import org.hl7.fhir.converter.NullVersionConverterAdvisor40;
 import org.hl7.fhir.convertors.*;
 import org.hl7.fhir.dstu3.model.Resource;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -69,6 +71,11 @@ public class VersionedApiConverterInterceptor extends InterceptorAdapter {
 
 	@Override
 	public boolean outgoingResponse(RequestDetails theRequestDetails, ResponseDetails theResponseDetails, HttpServletRequest theServletRequest, HttpServletResponse theServletResponse) throws AuthenticationException {
+		IBaseResource responseResource = theResponseDetails.getResponseResource();
+		if (responseResource == null) {
+			return true;
+		}
+
 		String[] formatParams = theRequestDetails.getParameters().get(Constants.PARAM_FORMAT);
 		String accept = null;
 		if (formatParams != null && formatParams.length > 0) {
@@ -92,15 +99,14 @@ public class VersionedApiConverterInterceptor extends InterceptorAdapter {
 			wantVersion = FhirVersionEnum.forVersionString(wantVersionString);
 		}
 
-		IBaseResource responseResource = theResponseDetails.getResponseResource();
 		FhirVersionEnum haveVersion = responseResource.getStructureFhirVersionEnum();
 
 		IBaseResource converted = null;
 		try {
 			if (wantVersion == FhirVersionEnum.R4 && haveVersion == FhirVersionEnum.DSTU3) {
-				converted = myVersionConvertor_30_40.convertResource(toDstu3(responseResource));
+				converted = myVersionConvertor_30_40.convertResource(toDstu3(responseResource), true);
 			} else if (wantVersion == FhirVersionEnum.DSTU3 && haveVersion == FhirVersionEnum.R4) {
-				converted = myVersionConvertor_30_40.convertResource(toR4(responseResource));
+				converted = myVersionConvertor_30_40.convertResource(toR4(responseResource), true);
 			} else if (wantVersion == FhirVersionEnum.DSTU2 && haveVersion == FhirVersionEnum.R4) {
 				converted = myVersionConvertor_10_40.convertResource(toR4(responseResource));
 			} else if (wantVersion == FhirVersionEnum.R4 && haveVersion == FhirVersionEnum.DSTU2) {
@@ -121,11 +127,11 @@ public class VersionedApiConverterInterceptor extends InterceptorAdapter {
 		return true;
 	}
 
-	private org.hl7.fhir.instance.model.Resource toDstu2(IBaseResource theResponseResource) {
+	private org.hl7.fhir.dstu2.model.Resource toDstu2(IBaseResource theResponseResource) {
 		if (theResponseResource instanceof IResource) {
-			return (org.hl7.fhir.instance.model.Resource) myCtxDstu2Hl7Org.newJsonParser().parseResource(myCtxDstu2.newJsonParser().encodeResourceToString(theResponseResource));
+			return (org.hl7.fhir.dstu2.model.Resource) myCtxDstu2Hl7Org.newJsonParser().parseResource(myCtxDstu2.newJsonParser().encodeResourceToString(theResponseResource));
 		}
-		return (org.hl7.fhir.instance.model.Resource) theResponseResource;
+		return (org.hl7.fhir.dstu2.model.Resource) theResponseResource;
 	}
 
 	private Resource toDstu3(IBaseResource theResponseResource) {

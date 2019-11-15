@@ -4,14 +4,14 @@ package ca.uhn.fhir.jpa.search;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,9 +20,7 @@ package ca.uhn.fhir.jpa.search;
  * #L%
  */
 
-import org.apache.lucene.analysis.core.LowerCaseFilterFactory;
-import org.apache.lucene.analysis.core.StopFilterFactory;
-import org.apache.lucene.analysis.core.WhitespaceTokenizerFactory;
+import org.apache.lucene.analysis.core.*;
 import org.apache.lucene.analysis.miscellaneous.WordDelimiterFilterFactory;
 import org.apache.lucene.analysis.ngram.EdgeNGramFilterFactory;
 import org.apache.lucene.analysis.ngram.NGramFilterFactory;
@@ -65,8 +63,9 @@ public class LuceneSearchMappingFactory {
 				.param("maxGramSize", "20")
 			.analyzerDef("standardAnalyzer", StandardTokenizerFactory.class)
 				.filter(LowerCaseFilterFactory.class)
-			.analyzerDef("exactAnalyzer", StandardTokenizerFactory.class)
-			.analyzerDef("conceptParentPidsAnalyzer", WhitespaceTokenizerFactory.class);
+			.analyzerDef("exactAnalyzer", KeywordTokenizerFactory.class)
+			.analyzerDef("conceptParentPidsAnalyzer", WhitespaceTokenizerFactory.class)
+			.analyzerDef("termConceptPropertyAnalyzer", WhitespaceTokenizerFactory.class);
 
 		return mapping;
 	}

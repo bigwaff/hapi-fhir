@@ -1,60 +1,54 @@
 package ca.uhn.fhir.jpa.config;
 
-import ca.uhn.fhir.jpa.dao.DaoConfig;
 import ca.uhn.fhir.jpa.search.LuceneSearchMappingFactory;
-import ca.uhn.fhir.jpa.subscription.email.IEmailSender;
-import ca.uhn.fhir.jpa.subscription.email.JavaMailEmailSender;
+import ca.uhn.fhir.jpa.subscription.module.subscriber.email.IEmailSender;
+import ca.uhn.fhir.jpa.subscription.module.subscriber.email.JavaMailEmailSender;
+import ca.uhn.fhir.jpa.util.CircularQueueCaptureQueriesListener;
+import ca.uhn.fhir.jpa.util.CurrentThreadCaptureQueriesListener;
 import ca.uhn.fhir.rest.server.interceptor.RequestValidatingInterceptor;
 import ca.uhn.fhir.validation.ResultSeverityEnum;
-import net.ttddyy.dsproxy.listener.logging.SLF4JLogLevel;
 import net.ttddyy.dsproxy.support.ProxyDataSourceBuilder;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.hibernate.jpa.HibernatePersistenceProvider;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.beans.factory.support.DefaultListableBeanFactory;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.context.annotation.Primary;
+import org.hibernate.dialect.H2Dialect;
+import org.springframework.context.annotation.*;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
-import org.springframework.core.env.Environment;
-import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
-import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
 
 @Configuration
+@Import(TestJPAConfig.class)
 @EnableTransactionManagement()
 public class TestDstu3Config extends BaseJavaConfigDstu3 {
 
 	static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(TestDstu3Config.class);
 	private Exception myLastStackTrace;
 
-	@Bean()
+	@Bean
+	public CircularQueueCaptureQueriesListener captureQueriesListener() {
+		return new CircularQueueCaptureQueriesListener();
+	}
+
+	@Bean
 	public BasicDataSource basicDataSource() {
 		BasicDataSource retVal = new BasicDataSource() {
 
 
 			@Override
-			public Connection getConnection() throws SQLException {
+			public Connection getConnection() {
 				ConnectionWrapper retVal;
 				try {
 					retVal = new ConnectionWrapper(super.getConnection());
 				} catch (Exception e) {
 					ourLog.error("Exceeded maximum wait for connection", e);
 					logGetConnectionStackTrace();
-//					if ("true".equals(System.getProperty("ci"))) {
+//					if ("true".equals(System.getStringProperty("ci"))) {
 					fail("Exceeded maximum wait for connection: " + e.toString());
 //					}
 //					System.exit(1);
@@ -88,8 +82,8 @@ public class TestDstu3Config extends BaseJavaConfigDstu3 {
 			}
 
 		};
-		retVal.setDriver(new org.apache.derby.jdbc.EmbeddedDriver());
-		retVal.setUrl("jdbc:derby:memory:myUnitTestDBDstu3;create=true");
+		retVal.setDriver(new org.h2.Driver());
+		retVal.setUrl("jdbc:h2:mem:testdb_dstu3");
 		retVal.setMaxWaitMillis(10000);
 		retVal.setUsername("");
 		retVal.setPassword("");
@@ -100,18 +94,12 @@ public class TestDstu3Config extends BaseJavaConfigDstu3 {
 		 * starvation
 		 */
 		int maxThreads = (int) (Math.random() * 6.0) + 1;
-		maxThreads = 1;
 		retVal.setMaxTotal(maxThreads);
 
 		return retVal;
 	}
 
-	@Bean()
-	public DaoConfig daoConfig() {
-		return new DaoConfig();
-	}
-
-	@Bean()
+	@Bean
 	@Primary()
 	public DataSource dataSource() {
 
@@ -119,6 +107,8 @@ public class TestDstu3Config extends BaseJavaConfigDstu3 {
 			.create(basicDataSource())
 //			.logQueryBySlf4j(SLF4JLogLevel.INFO, "SQL")
 			.logSlowQueryBySlf4j(1000, TimeUnit.MILLISECONDS)
+			.afterQuery(captureQueriesListener())
+			.afterQuery(new CurrentThreadCaptureQueriesListener())
 			.countQuery()
 			.build();
 
@@ -133,13 +123,12 @@ public class TestDstu3Config extends BaseJavaConfigDstu3 {
 		return retVal;
 	}
 
-	@Bean()
+	@Override
+	@Bean
 	public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
-		LocalContainerEntityManagerFactoryBean retVal = new LocalContainerEntityManagerFactoryBean();
+		LocalContainerEntityManagerFactoryBean retVal = super.entityManagerFactory();
 		retVal.setPersistenceUnitName("PU_HapiFhirJpaDstu3");
 		retVal.setDataSource(dataSource());
-		retVal.setPackagesToScan("ca.uhn.fhir.jpa.entity");
-		retVal.setPersistenceProvider(new HibernatePersistenceProvider());
 		retVal.setJpaProperties(jpaProperties());
 		return retVal;
 	}
@@ -150,9 +139,9 @@ public class TestDstu3Config extends BaseJavaConfigDstu3 {
 		extraProperties.put("hibernate.format_sql", "false");
 		extraProperties.put("hibernate.show_sql", "false");
 		extraProperties.put("hibernate.hbm2ddl.auto", "update");
-		extraProperties.put("hibernate.dialect", "org.hibernate.dialect.DerbyTenSevenDialect");
+		extraProperties.put("hibernate.dialect", H2Dialect.class.getName());
 		extraProperties.put("hibernate.search.model_mapping", LuceneSearchMappingFactory.class.getName());
-		extraProperties.put("hibernate.search.default.directory_provider", "ram");
+		extraProperties.put("hibernate.search.default.directory_provider", "local-heap");
 		extraProperties.put("hibernate.search.lucene_version", "LUCENE_CURRENT");
 		extraProperties.put("hibernate.search.autoregister_listeners", "true");
 		return extraProperties;
@@ -173,18 +162,6 @@ public class TestDstu3Config extends BaseJavaConfigDstu3 {
 		return requestValidator;
 	}
 
-	@Bean()
-	public JpaTransactionManager transactionManager(EntityManagerFactory entityManagerFactory) {
-		JpaTransactionManager retVal = new JpaTransactionManager();
-		retVal.setEntityManagerFactory(entityManagerFactory);
-		return retVal;
-	}
-
-	@Bean
-	public UnregisterScheduledProcessor unregisterScheduledProcessor(Environment theEnv) {
-		return new UnregisterScheduledProcessor(theEnv);
-	}
-
 	/**
 	 * This lets the "@Value" fields reference properties from the properties file
 	 */
@@ -193,24 +170,5 @@ public class TestDstu3Config extends BaseJavaConfigDstu3 {
 		return new PropertySourcesPlaceholderConfigurer();
 	}
 
-
-	public class UnregisterScheduledProcessor implements BeanFactoryPostProcessor {
-
-		private final Environment myEnvironment;
-
-		public UnregisterScheduledProcessor(Environment theEnv) {
-			myEnvironment = theEnv;
-		}
-
-		@Override
-		public void postProcessBeanFactory(final ConfigurableListableBeanFactory beanFactory) throws BeansException {
-			String schedulingDisabled = myEnvironment.getProperty("scheduling_disabled");
-			if ("true".equals(schedulingDisabled)) {
-				for (String beanName : beanFactory.getBeanNamesForType(ScheduledAnnotationBeanPostProcessor.class)) {
-					((DefaultListableBeanFactory) beanFactory).removeBeanDefinition(beanName);
-				}
-			}
-		}
-	}
 
 }

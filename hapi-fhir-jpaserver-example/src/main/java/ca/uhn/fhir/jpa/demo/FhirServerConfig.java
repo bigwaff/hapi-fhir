@@ -5,10 +5,11 @@ import java.util.Properties;
 import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 
+import ca.uhn.fhir.jpa.model.entity.ModelConfig;
 import ca.uhn.fhir.jpa.search.LuceneSearchMappingFactory;
+import ca.uhn.fhir.jpa.util.DerbyTenSevenHapiFhirDialect;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.commons.lang3.time.DateUtils;
-import org.hibernate.jpa.HibernatePersistenceProvider;
+import org.hl7.fhir.dstu2.model.Subscription;
 import org.springframework.beans.factory.annotation.Autowire;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,21 +34,30 @@ public class FhirServerConfig extends BaseJavaConfigDstu3 {
 	/**
 	 * Configure FHIR properties around the the JPA server via this bean
 	 */
-	@Bean()
+	@Bean
 	public DaoConfig daoConfig() {
 		DaoConfig retVal = new DaoConfig();
 		retVal.setAllowMultipleDelete(true);
+		retVal.addSupportedSubscriptionType(Subscription.SubscriptionChannelType.WEBSOCKET);
+		retVal.addSupportedSubscriptionType(Subscription.SubscriptionChannelType.RESTHOOK);
+		retVal.addSupportedSubscriptionType(Subscription.SubscriptionChannelType.EMAIL);
+		retVal.setSubscriptionMatchingEnabled(true);
 		return retVal;
+	}
+
+	@Bean
+	public ModelConfig modelConfig() {
+		return daoConfig().getModelConfig();
 	}
 
 	/**
 	 * The following bean configures the database connection. The 'url' property value of "jdbc:derby:directory:jpaserver_derby_files;create=true" indicates that the server should save resources in a
 	 * directory called "jpaserver_derby_files".
-	 * 
+	 *
 	 * A URL to a remote database could also be placed here, along with login credentials and other properties supported by BasicDataSource.
 	 */
 	@Bean(destroyMethod = "close")
-	public DataSource dataSource() {
+	public BasicDataSource dataSource() {
 		BasicDataSource retVal = new BasicDataSource();
 		retVal.setDriver(new org.apache.derby.jdbc.EmbeddedDriver());
 		retVal.setUrl("jdbc:derby:directory:target/jpaserver_derby_files;create=true");
@@ -56,20 +66,19 @@ public class FhirServerConfig extends BaseJavaConfigDstu3 {
 		return retVal;
 	}
 
-	@Bean()
+	@Override
+	@Bean
 	public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
-		LocalContainerEntityManagerFactoryBean retVal = new LocalContainerEntityManagerFactoryBean();
+		LocalContainerEntityManagerFactoryBean retVal = super.entityManagerFactory();
 		retVal.setPersistenceUnitName("HAPI_PU");
 		retVal.setDataSource(dataSource());
-		retVal.setPackagesToScan("ca.uhn.fhir.jpa.entity");
-		retVal.setPersistenceProvider(new HibernatePersistenceProvider());
 		retVal.setJpaProperties(jpaProperties());
 		return retVal;
 	}
 
 	private Properties jpaProperties() {
 		Properties extraProperties = new Properties();
-		extraProperties.put("hibernate.dialect", org.hibernate.dialect.DerbyTenSevenDialect.class.getName());
+		extraProperties.put("hibernate.dialect", DerbyTenSevenHapiFhirDialect.class.getName());
 		extraProperties.put("hibernate.format_sql", "true");
 		extraProperties.put("hibernate.show_sql", "false");
 		extraProperties.put("hibernate.hbm2ddl.auto", "update");
@@ -89,7 +98,7 @@ public class FhirServerConfig extends BaseJavaConfigDstu3 {
 	/**
 	 * Do some fancy logging to create a nice access log that has details about each incoming request.
 	 */
-	public IServerInterceptor loggingInterceptor() {
+	public LoggingInterceptor loggingInterceptor() {
 		LoggingInterceptor retVal = new LoggingInterceptor();
 		retVal.setLoggerName("fhirtest.access");
 		retVal.setMessageFormat(
@@ -103,7 +112,7 @@ public class FhirServerConfig extends BaseJavaConfigDstu3 {
 	 * This interceptor adds some pretty syntax highlighting in responses when a browser is detected
 	 */
 	@Bean(autowire = Autowire.BY_TYPE)
-	public IServerInterceptor responseHighlighterInterceptor() {
+	public ResponseHighlighterInterceptor responseHighlighterInterceptor() {
 		ResponseHighlighterInterceptor retVal = new ResponseHighlighterInterceptor();
 		return retVal;
 	}
@@ -114,11 +123,10 @@ public class FhirServerConfig extends BaseJavaConfigDstu3 {
 		return retVal;
 	}
 
-	@Bean()
+	@Bean
 	public JpaTransactionManager transactionManager(EntityManagerFactory entityManagerFactory) {
 		JpaTransactionManager retVal = new JpaTransactionManager();
 		retVal.setEntityManagerFactory(entityManagerFactory);
 		return retVal;
 	}
-
 }

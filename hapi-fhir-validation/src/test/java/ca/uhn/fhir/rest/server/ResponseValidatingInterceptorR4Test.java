@@ -11,6 +11,7 @@ import static org.mockito.Mockito.mock;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import ca.uhn.fhir.rest.api.EncodingEnum;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.*;
@@ -25,7 +26,9 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.hapi.validation.FhirInstanceValidator;
 import org.hl7.fhir.r4.model.Enumerations.AdministrativeGender;
 import org.hl7.fhir.r4.model.IdType;
+import org.hl7.fhir.r4.model.Narrative;
 import org.hl7.fhir.r4.model.Patient;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.junit.*;
 import org.mockito.Mockito;
 
@@ -38,7 +41,7 @@ import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.param.StringParam;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.interceptor.ResponseValidatingInterceptor;
-import ca.uhn.fhir.util.PortUtil;
+import ca.uhn.fhir.test.utilities.JettyUtil;
 import ca.uhn.fhir.util.TestUtil;
 import ca.uhn.fhir.validation.*;
 
@@ -56,9 +59,7 @@ public class ResponseValidatingInterceptorR4Test {
 	@Before
 	public void before() {
 		myReturnResource = null;
-		while (ourServlet.getInterceptors().size() > 0) {
-			ourServlet.unregisterInterceptor(ourServlet.getInterceptors().get(0));
-		}
+		ourServlet.getInterceptorService().unregisterAllInterceptors();
 
 		myInterceptor = new ResponseValidatingInterceptor();
 		// myInterceptor.setFailOnSeverity(ResultSeverityEnum.ERROR);
@@ -84,7 +85,7 @@ public class ResponseValidatingInterceptorR4Test {
 		myInterceptor.addValidatorModule(module);
 		myInterceptor.setIgnoreValidatorExceptions(false);
 
-		Mockito.doThrow(NullPointerException.class).when(module).validateResource(Mockito.any(IValidationContext.class));
+		Mockito.doThrow(new NullPointerException("SOME MESSAGE")).when(module).validateResource(Mockito.any(IValidationContext.class));
 		
 		HttpGet httpPost = new HttpGet("http://localhost:" + ourPort + "/Patient?foo=bar");
 		HttpResponse status = ourClient.execute(httpPost);
@@ -96,7 +97,7 @@ public class ResponseValidatingInterceptorR4Test {
 		ourLog.info("Response was:\n{}", responseContent);
 
 		assertEquals(500, status.getStatusLine().getStatusCode());
-		assertThat(responseContent, containsString("<diagnostics value=\"java.lang.NullPointerException\"/>"));
+		assertThat(responseContent, containsString("<diagnostics value=\"SOME MESSAGE\"/>"));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -261,6 +262,7 @@ public class ResponseValidatingInterceptorR4Test {
 	public void testOperationOutcome() throws Exception {
 		myInterceptor.setAddResponseOutcomeHeaderOnSeverity(ResultSeverityEnum.INFORMATION);
 		Patient patient = new Patient();
+		patient.getText().setDiv(new XhtmlNode().setValue("<div>AA</div>")).setStatus(Narrative.NarrativeStatus.GENERATED);
 		patient.addIdentifier().setValue("002");
 		patient.setGender(AdministrativeGender.MALE);
 		myReturnResource = patient;
@@ -308,6 +310,7 @@ public class ResponseValidatingInterceptorR4Test {
 	@Test
 	public void testSearchJsonValidNoValidatorsSpecified() throws Exception {
 		Patient patient = new Patient();
+		patient.getText().setDiv(new XhtmlNode().setValue("<div>AA</div>")).setStatus(Narrative.NarrativeStatus.GENERATED);
 		patient.addIdentifier().setValue("002");
 		patient.setGender(AdministrativeGender.MALE);
 		myReturnResource = patient;
@@ -332,6 +335,7 @@ public class ResponseValidatingInterceptorR4Test {
 		myInterceptor.setAddResponseHeaderOnSeverity(ResultSeverityEnum.INFORMATION);
 
 		Patient patient = new Patient();
+		patient.getText().setDiv(new XhtmlNode().setValue("<div>AA</div>")).setStatus(Narrative.NarrativeStatus.GENERATED);
 		patient.addIdentifier().setValue("002");
 		patient.setGender(AdministrativeGender.MALE);
 		myReturnResource = patient;
@@ -404,6 +408,7 @@ public class ResponseValidatingInterceptorR4Test {
 	@Test
 	public void testSearchXmlValidNoValidatorsSpecified() throws Exception {
 		Patient patient = new Patient();
+		patient.getText().setDiv(new XhtmlNode().setValue("<div>AA</div>")).setStatus(Narrative.NarrativeStatus.GENERATED);
 		patient.addIdentifier().setValue("002");
 		patient.setGender(AdministrativeGender.MALE);
 		myReturnResource = patient;
@@ -465,24 +470,26 @@ public class ResponseValidatingInterceptorR4Test {
 
 	@AfterClass
 	public static void afterClassClearContext() throws Exception {
-		ourServer.stop();
+		JettyUtil.closeServer(ourServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
 	@BeforeClass
 	public static void beforeClass() throws Exception {
-		ourPort = PortUtil.findFreePort();
-		ourServer = new Server(ourPort);
+		ourServer = new Server(0);
 
 		PatientProvider patientProvider = new PatientProvider();
 
 		ServletHandler proxyHandler = new ServletHandler();
 		ourServlet = new RestfulServer(ourCtx);
 		ourServlet.setResourceProviders(patientProvider);
+		ourServlet.setDefaultResponseEncoding(EncodingEnum.XML);
+
 		ServletHolder servletHolder = new ServletHolder(ourServlet);
 		proxyHandler.addServletWithMapping(servletHolder, "/*");
 		ourServer.setHandler(proxyHandler);
-		ourServer.start();
+		JettyUtil.startServer(ourServer);
+        ourPort = JettyUtil.getPortForStartedServer(ourServer);
 
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
 		HttpClientBuilder builder = HttpClientBuilder.create();

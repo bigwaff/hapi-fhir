@@ -4,14 +4,14 @@ package ca.uhn.fhir.jpa.provider.dstu3;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,6 +22,7 @@ package ca.uhn.fhir.jpa.provider.dstu3;
 
 import ca.uhn.fhir.jpa.dao.IFhirResourceDaoValueSet;
 import ca.uhn.fhir.jpa.dao.IFhirResourceDaoValueSet.ValidateCodeResult;
+import ca.uhn.fhir.jpa.model.util.JpaConstants;
 import ca.uhn.fhir.rest.annotation.IdParam;
 import ca.uhn.fhir.rest.annotation.Operation;
 import ca.uhn.fhir.rest.annotation.OperationParam;
@@ -34,8 +35,9 @@ import javax.servlet.http.HttpServletRequest;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 public class BaseJpaResourceProviderValueSetDstu3 extends JpaResourceProviderDstu3<ValueSet> {
+	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(BaseJpaResourceProviderValueSetDstu3.class);
 
-	@Operation(name = "$expand", idempotent = true)
+	@Operation(name = JpaConstants.OPERATION_EXPAND, idempotent = true)
 	public ValueSet expand(
 		HttpServletRequest theServletRequest,
 		@IdParam(optional = true) IdType theId,
@@ -45,6 +47,8 @@ public class BaseJpaResourceProviderValueSetDstu3 extends JpaResourceProviderDst
 		@OperationParam(name = "url", min = 0, max = 1) UriType theUrl,
 		@OperationParam(name = "identifier", min = 0, max = 1) UriType theIdentifier,
 		@OperationParam(name = "filter", min = 0, max = 1) StringType theFilter,
+		@OperationParam(name = "offset", min = 0, max = 1) IntegerType theOffset,
+		@OperationParam(name = "count", min = 0, max = 1) IntegerType theCount,
 		RequestDetails theRequestDetails) {
 
 		boolean haveId = theId != null && theId.hasIdPart();
@@ -54,27 +58,59 @@ public class BaseJpaResourceProviderValueSetDstu3 extends JpaResourceProviderDst
 		}
 
 		boolean haveIdentifier = url != null && isNotBlank(url.getValue());
-		boolean haveValueSet = theValueSet != null && theValueSet.isEmpty() == false;
+		boolean haveValueSet = theValueSet != null && !theValueSet.isEmpty();
 
 		if (!haveId && !haveIdentifier && !haveValueSet) {
-			throw new InvalidRequestException("$expand operation at the type level (no ID specified) requires an identifier or a valueSet as a part of the request");
+			throw new InvalidRequestException("$expand operation at the type level (no ID specified) requires an identifier or a valueSet as a part of the request.");
 		}
 
 		if (moreThanOneTrue(haveId, haveIdentifier, haveValueSet)) {
 			throw new InvalidRequestException("$expand must EITHER be invoked at the instance level, or have an identifier specified, or have a ValueSet specified. Can not combine these options.");
 		}
 
+		int offset = myDaoConfig.getPreExpandValueSetsDefaultOffset();
+		if (theOffset != null && theOffset.hasValue()) {
+			if (theOffset.getValue() >= 0) {
+				offset = theOffset.getValue();
+			} else {
+				throw new InvalidRequestException("offset parameter for $expand operation must be >= 0 when specified. offset: " + theOffset.getValue());
+			}
+		}
+
+		int count = myDaoConfig.getPreExpandValueSetsDefaultCount();
+		if (theCount != null && theCount.hasValue()) {
+			if (theCount.getValue() >= 0) {
+				count = theCount.getValue();
+			} else {
+				throw new InvalidRequestException("count parameter for $expand operation must be >= 0 when specified. count: " + theCount.getValue());
+			}
+		}
+		int countMax = myDaoConfig.getPreExpandValueSetsMaxCount();
+		if (count > countMax) {
+			ourLog.warn("count parameter for $expand operation of {} exceeds maximum value of {}; using maximum value.", count, countMax);
+			count = countMax;
+		}
+
 		startRequest(theServletRequest);
 		try {
 			IFhirResourceDaoValueSet<ValueSet, Coding, CodeableConcept> dao = (IFhirResourceDaoValueSet<ValueSet, Coding, CodeableConcept>) getDao();
-			if (haveId) {
-				return dao.expand(theId, toFilterString(theFilter), theRequestDetails);
-			} else if (haveIdentifier) {
-				return dao.expandByIdentifier(url.getValue(), toFilterString(theFilter));
+			if (myDaoConfig.isPreExpandValueSets()) {
+				if (haveId) {
+					return dao.expand(theId, toFilterString(theFilter), offset, count, theRequestDetails);
+				} else if (haveIdentifier) {
+					return dao.expandByIdentifier(url.getValue(), toFilterString(theFilter), offset, count);
+				} else {
+					return dao.expand(theValueSet, toFilterString(theFilter), offset, count);
+				}
 			} else {
-				return dao.expand(theValueSet, toFilterString(theFilter));
+				if (haveId) {
+					return dao.expand(theId, toFilterString(theFilter), theRequestDetails);
+				} else if (haveIdentifier) {
+					return dao.expandByIdentifier(url.getValue(), toFilterString(theFilter));
+				} else {
+					return dao.expand(theValueSet, toFilterString(theFilter));
+				}
 			}
-
 		} finally {
 			endRequest(theServletRequest);
 		}
@@ -87,7 +123,7 @@ public class BaseJpaResourceProviderValueSetDstu3 extends JpaResourceProviderDst
 
 
 	@SuppressWarnings("unchecked")
-	@Operation(name = "$validate-code", idempotent = true, returnParameters = {
+	@Operation(name = JpaConstants.OPERATION_VALIDATE_CODE, idempotent = true, returnParameters = {
 		@OperationParam(name = "result", type = BooleanType.class, min = 1),
 		@OperationParam(name = "message", type = StringType.class),
 		@OperationParam(name = "display", type = StringType.class)

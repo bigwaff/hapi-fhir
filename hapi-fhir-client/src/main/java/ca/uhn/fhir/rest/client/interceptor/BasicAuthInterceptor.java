@@ -4,14 +4,14 @@ package ca.uhn.fhir.rest.client.interceptor;
  * #%L
  * HAPI FHIR - Client Framework
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.client.api.*;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
+import org.apache.commons.lang3.Validate;
 
 /**
  * HTTP interceptor to be used for adding HTTP basic auth username/password tokens
@@ -42,30 +43,34 @@ public class BasicAuthInterceptor implements IClientInterceptor {
 
 	private String myUsername;
 	private String myPassword;
+	private String myHeaderValue;
 
-    public BasicAuthInterceptor(String theUsername, String thePassword) {
-		super();
-		myUsername = theUsername;
-		myPassword = thePassword;
+	/**
+	 * @param theUsername The username
+	 * @param thePassword The password
+	 */
+	public BasicAuthInterceptor(String theUsername, String thePassword) {
+		this(StringUtils.defaultString(theUsername) + ":" + StringUtils.defaultString(thePassword));
+	}
+
+	/**
+	 * @param theCredentialString A credential string in the format <code>username:password</code>
+	 */
+	public BasicAuthInterceptor(String theCredentialString) {
+		Validate.notBlank(theCredentialString, "theCredentialString must not be null or blank");
+		Validate.isTrue(theCredentialString.contains(":"), "theCredentialString must be in the format 'username:password'");
+		String encoded = Base64.encodeBase64String(theCredentialString.getBytes(Constants.CHARSET_US_ASCII));
+		myHeaderValue = "Basic " + encoded;
 	}
 
 	@Override
 	public void interceptRequest(IHttpRequest theRequest) {
-		String authorizationUnescaped = StringUtils.defaultString(myUsername) + ":" + StringUtils.defaultString(myPassword);
-        String encoded;
-        try {
-                encoded = Base64.encodeBase64String(authorizationUnescaped.getBytes("ISO-8859-1"));
-        } catch (UnsupportedEncodingException e) {
-                throw new InternalErrorException("Could not find US-ASCII encoding. This shouldn't happen!");
-        }
-        theRequest.addHeader(Constants.HEADER_AUTHORIZATION, ("Basic " + encoded));
+		theRequest.addHeader(Constants.HEADER_AUTHORIZATION, myHeaderValue);
 	}
 
 	@Override
 	public void interceptResponse(IHttpResponse theResponse) throws IOException {
 		// nothing
 	}
-
-	
 
 }

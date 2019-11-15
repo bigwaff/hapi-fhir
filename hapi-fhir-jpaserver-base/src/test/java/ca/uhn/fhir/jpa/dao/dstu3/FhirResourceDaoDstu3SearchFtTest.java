@@ -9,21 +9,17 @@ import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 
 import ca.uhn.fhir.jpa.dao.BaseHapiFhirResourceDao;
-import ca.uhn.fhir.jpa.entity.ResourceTable;
 import org.hl7.fhir.dstu3.model.*;
 import org.hl7.fhir.dstu3.model.Observation.ObservationStatus;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.junit.*;
 
 import ca.uhn.fhir.jpa.dao.FulltextSearchSvcImpl.Suggestion;
-import ca.uhn.fhir.jpa.dao.SearchParameterMap;
+import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.param.*;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import ca.uhn.fhir.util.TestUtil;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.TransactionCallbackWithoutResult;
-import org.springframework.transaction.support.TransactionTemplate;
 
 public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 	
@@ -151,19 +147,19 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		myMediaDao.create(med, mockSrd());
 		ourLog.info(myFhirCtx.newJsonParser().encodeResourceToString(med));
 		
-		List<Suggestion> output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "press");
+		List<Suggestion> output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "press", null);
 		ourLog.info("Found: " + output);
 		assertEquals(2, output.size());
 		assertEquals("Pressure", output.get(0).getTerm());
 		assertEquals("Systolic Blood Pressure", output.get(1).getTerm());
 
-		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "prezure");
+		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "prezure", null);
 		ourLog.info("Found: " + output);
 		assertEquals(2, output.size());
 		assertEquals("Pressure", output.get(0).getTerm());
 		assertEquals("Systolic Blood Pressure", output.get(1).getTerm());
 
-		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "syst");
+		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "syst", null);
 		ourLog.info("Found: " + output);
 		assertEquals(4, output.size());
 		assertEquals("syst", output.get(0).getTerm());
@@ -171,7 +167,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		assertEquals("Systolic", output.get(2).getTerm());
 		assertEquals("Systolic Blood Pressure", output.get(3).getTerm());
 		
-		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "LCws");
+		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "LCws", null);
 		ourLog.info("Found: " + output);
 		assertEquals(0, output.size());
 	}
@@ -210,7 +206,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		obs2.getCode().setText("ZXCVBNMZZ");
 		myObservationDao.create(obs2, mockSrd());
 
-		List<Suggestion> output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "ZXCVBNM");
+		List<Suggestion> output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "ZXCVBNM", null);
 		ourLog.info("Found: " + output);
 		assertEquals(4, output.size());
 		assertEquals("ZXCVBNM", output.get(0).getTerm());
@@ -218,7 +214,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		assertEquals("ZXC", output.get(2).getTerm());
 		assertEquals("ZXC HELLO", output.get(3).getTerm());
 
-		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "ZXC");
+		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "ZXC", null);
 		ourLog.info("Found: " + output);
 		assertEquals(4, output.size());
 		assertEquals("ZXC", output.get(0).getTerm());
@@ -226,17 +222,17 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		assertEquals("ZXCVBNM", output.get(2).getTerm());
 		assertEquals("ZXCVBNM ASDFGHJKL QWERTYUIOPASDFGHJKL", output.get(3).getTerm());
 
-		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "HELO");
+		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "HELO", null);
 		ourLog.info("Found: " + output);
 		assertEquals(2, output.size());
 		assertEquals("HELLO", output.get(0).getTerm());
 		assertEquals("ZXC HELLO", output.get(1).getTerm());
 		
-		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "Z");
+		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "Z", null);
 		ourLog.info("Found: " + output);
 		assertEquals(0, output.size());
 
-		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "ZX");
+		output = mySearchDao.suggestKeywords("Patient/" + ptId.getIdPart() + "/$everything", "_content", "ZX", null);
 		ourLog.info("Found: " + output);
 		assertEquals(2, output.size());
 		assertEquals("ZXC", output.get(0).getTerm());
@@ -268,7 +264,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		 */
 
 		patient = new Patient();
-		patient.setId(pId1);
+		patient.setId(pId1.getValue());
 		patient.getText().setDivAsString("<div>DIVBBB</div>");
 		patient.addName().addGiven("NAMEBBB");
 		myPatientDao.update(patient, mockSrd());
@@ -338,16 +334,16 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		
 		param = new StringAndListParam();
 		param.addAnd(new StringOrListParam().addOr(new StringParam("obsvalue1")));
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, param, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, param, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId1, devId1)));
 
 		param = new StringAndListParam();
 		param.addAnd(new StringOrListParam().addOr(new StringParam("obstext1")));
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, null, param, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, null, param, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId1, devId1)));
 
 		request = mock(HttpServletRequest.class);
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, null, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, null, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId1, obsId2, devId1)));
 
 		/*
@@ -363,7 +359,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 
 		param = new StringAndListParam();
 		param.addAnd(new StringOrListParam().addOr(new StringParam("obsvalue1")));
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, param, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, param, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId1, obsId4, devId1)));
 
 		/*
@@ -379,7 +375,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 
 		param = new StringAndListParam();
 		param.addAnd(new StringOrListParam().addOr(new StringParam("obsvalue1")));
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, param, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientInstanceEverything(request, ptId1, null, null, null, param, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId4)));
 
 	}
@@ -430,11 +426,11 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 		
 		param = new StringAndListParam();
 		param.addAnd(new StringOrListParam().addOr(new StringParam("obsvalue1")));
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, param, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, param, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId1, devId1)));
 
 		request = mock(HttpServletRequest.class);
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, null, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, null, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId1, obsId2, devId1, ptId2, obsId3)));
 
 		/*
@@ -450,7 +446,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 
 		param = new StringAndListParam();
 		param.addAnd(new StringOrListParam().addOr(new StringParam("obsvalue1")));
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, param, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, param, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId1, obsId4, devId1)));
 
 		/*
@@ -466,7 +462,7 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 
 		param = new StringAndListParam();
 		param.addAnd(new StringOrListParam().addOr(new StringParam("obsvalue1")));
-		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, param, null, mockSrd()));
+		actual = toUnqualifiedVersionlessIdValues(myPatientDao.patientTypeEverything(request, null, null, null, param, null, null, mockSrd()));
 		assertThat(actual, containsInAnyOrder(toValues(ptId1, obsId4)));
 
 	}
@@ -489,11 +485,12 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 
 		map = new SearchParameterMap();
 		map.add(Constants.PARAM_CONTENT, new StringParam("NAMEAAA"));
-		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(toValues(pId1)));
+		String[] idArray = toValues(pId1);
+		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(idArray));
 
 		map = new SearchParameterMap();
 		map.add(Constants.PARAM_TEXT, new StringParam("DIVAAA"));
-		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(toValues(pId1)));
+		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(idArray));
 
 		/*
 		 * Update but don't reindex
@@ -507,10 +504,10 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 
 		map = new SearchParameterMap();
 		map.add(Constants.PARAM_CONTENT, new StringParam("NAMEAAA"));
-		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(toValues(pId1)));
+		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(idArray));
 		map = new SearchParameterMap();
 		map.add(Constants.PARAM_CONTENT, new StringParam("NAMEBBB"));
-		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), not(contains(toValues(pId1))));
+		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), not(contains(idArray)));
 
 		myPatientDao.update(patient, null, true, mockSrd());
 
@@ -520,15 +517,15 @@ public class FhirResourceDaoDstu3SearchFtTest extends BaseJpaDstu3Test {
 
 		map = new SearchParameterMap();
 		map.add(Patient.SP_NAME, new StringParam("NAMEBBB"));
-		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(toValues(pId1)));
+		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(idArray));
 
 		map = new SearchParameterMap();
 		map.add(Constants.PARAM_CONTENT, new StringParam("NAMEBBB"));
-		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(toValues(pId1)));
+		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(idArray));
 
 		map = new SearchParameterMap();
 		map.add(Constants.PARAM_TEXT, new StringParam("DIVBBB"));
-		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(toValues(pId1)));
+		assertThat(toUnqualifiedVersionlessIdValues(myPatientDao.search(map)), contains(idArray));
 
 	}
 

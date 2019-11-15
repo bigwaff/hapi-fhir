@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>ca.uhn.hapi.fhir</groupId>
 		<artifactId>hapi-fhir</artifactId>
-		<version>3.3.0-SNAPSHOT</version>
+		<version>4.2.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -32,7 +32,7 @@
 						<configuration>
 							<signature>
 								<groupId>org.codehaus.mojo.signature</groupId>
-								<artifactId>java17</artifactId>
+								<artifactId>java18</artifactId>
 								<version>1.0</version>
 							</signature>
 						</configuration>
@@ -100,8 +100,12 @@
 							<artifactId>javax.mail-api</artifactId>
 						</dependency>
 						<dependency>
-							<groupId>com.phloc</groupId>
-							<artifactId>phloc-commons</artifactId>
+							<groupId>javax.activation</groupId>
+							<artifactId>javax.activation-api</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>com.helger</groupId>
+							<artifactId>ph-schematron</artifactId>
 						</dependency>
 						<dependency>
 							<groupId>commons-logging</groupId>
@@ -115,10 +119,42 @@
 							<groupId>org.springframework</groupId>
 							<artifactId>spring-jcl</artifactId>
 						</dependency>
+						<dependency>
+							<groupId>org.springframework</groupId>
+							<artifactId>spring-jcl</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>com.google.code.findbugs</groupId>
+							<artifactId>annotations</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>org.apache.derby</groupId>
+							<artifactId>derbyclient</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>org.apache.derby</groupId>
+							<artifactId>derbynet</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>org.apache.derby</groupId>
+							<artifactId>derbyclient</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>org.checkerframework</groupId>
+							<artifactId>checker-compat-qual</artifactId>
+						</dependency>
+						<dependency>
+							<groupId>org.apache.poi</groupId>
+							<artifactId>ooxml-schemas</artifactId>
+						</dependency>
 					</ignoredDependencies>
 					<ignoredResourcePatterns>
-						<ignoredResourcePattern>changelog.txt</ignoredResourcePattern>
+						<ignoredResourcePattern>.*\.txt$</ignoredResourcePattern>
+						<ignoredResourcePattern>.*\.html$</ignoredResourcePattern>
+						<ignoredResourcePattern>schemaorg_apache_xmlbeans.*</ignoredResourcePattern>
 						<ignoredResource>javac.bat</ignoredResource>
+						<ignoredResource>about.html</ignoredResource>
+						<ignoredResource>changelog.xml</ignoredResource>
 					</ignoredResourcePatterns>
 				</configuration>
 			</plugin>
@@ -149,6 +185,8 @@
 								<link>https://docs.oracle.com/javaee/7/api/</link>
 							</links>
 							<additionalparam>-Xdoclint:none</additionalparam>
+							<additionalJOption>-Xdoclint:none</additionalJOption>
+							<source>8</source>
 						</configuration>
 					</reportSet>
 				</reportSets>
@@ -171,12 +209,14 @@
 							<linksource>true</linksource>
 							<verbose>false</verbose>
 							<debug>false</debug>
-							<additionalparam>-Xdoclint:none</additionalparam>
+							<additionalJOption>-Xdoclint:none</additionalJOption>
+							<source>8</source>
 						</configuration>
 						<executions>
 							<execution>
 								<phase>package</phase>
 								<goals>
+									<!--<goal>aggregate-jar</goal>-->
 									<goal>jar</goal>
 								</goals>
 							</execution>
@@ -208,6 +248,7 @@
 									<licenseName>apache_v2</licenseName>
 									<canUpdateDescription>true</canUpdateDescription>
 									<canUpdateCopyright>true</canUpdateCopyright>
+									<trimHeaderLine>true</trimHeaderLine>
 									<roots>
 										<root>src/main/java</root>
 									</roots>

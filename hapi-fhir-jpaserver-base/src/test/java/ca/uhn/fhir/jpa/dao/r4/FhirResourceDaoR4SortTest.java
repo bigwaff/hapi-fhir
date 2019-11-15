@@ -1,6 +1,6 @@
 package ca.uhn.fhir.jpa.dao.r4;
 
-import ca.uhn.fhir.jpa.dao.SearchParameterMap;
+import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.SortOrderEnum;
 import ca.uhn.fhir.rest.api.SortSpec;
@@ -83,8 +83,12 @@ public class FhirResourceDaoR4SortTest extends BaseJpaR4Test {
 		map = new SearchParameterMap();
 		map.setSort(new SortSpec("_id", SortOrderEnum.ASC));
 		ids = toUnqualifiedVersionlessIdValues(myPatientDao.search(map));
-		assertThat(ids, contains("Patient/AA", "Patient/AB", id1, id2));
+		assertThat(ids, contains(id1, id2, "Patient/AA", "Patient/AB"));
 
+		map = new SearchParameterMap();
+		map.setSort(new SortSpec("_id", SortOrderEnum.DESC));
+		ids = toUnqualifiedVersionlessIdValues(myPatientDao.search(map));
+		assertThat(ids, contains("Patient/AB", "Patient/AA", id2, id1));
 	}
 
 	@Test
@@ -206,31 +210,38 @@ public class FhirResourceDaoR4SortTest extends BaseJpaR4Test {
 	@SuppressWarnings("unused")
 	@Test
 	public void testSortOnSparselyPopulatedFields() {
+//		myDaoConfig.setIndexMissingFields(DaoConfig.IndexEnabledEnum.DISABLED);
+
 		IIdType pid1, pid2, pid3, pid4, pid5, pid6;
 		{
 			Patient p = new Patient();
+			p.setId("pid1");
 			p.setActive(true);
-			pid1 = myPatientDao.create(p, mySrd).getId().toUnqualifiedVersionless();
+			pid1 = myPatientDao.update(p, mySrd).getId().toUnqualifiedVersionless();
 		}
 		{
 			Patient p = new Patient();
+			p.setId("pid2");
 			p.addName().setFamily("A");
-			pid2 = myPatientDao.create(p, mySrd).getId().toUnqualifiedVersionless();
+			pid2 = myPatientDao.update(p, mySrd).getId().toUnqualifiedVersionless();
 		}
 		{
 			Patient p = new Patient();
+			p.setId("pid3");
 			p.addName().setFamily("B");
-			pid3 = myPatientDao.create(p, mySrd).getId().toUnqualifiedVersionless();
+			pid3 = myPatientDao.update(p, mySrd).getId().toUnqualifiedVersionless();
 		}
 		{
 			Patient p = new Patient();
+			p.setId("pid4");
 			p.addName().setFamily("B").addGiven("A");
-			pid4 = myPatientDao.create(p, mySrd).getId().toUnqualifiedVersionless();
+			pid4 = myPatientDao.update(p, mySrd).getId().toUnqualifiedVersionless();
 		}
 		{
 			Patient p = new Patient();
+			p.setId("pid5");
 			p.addName().setFamily("B").addGiven("B");
-			pid5 = myPatientDao.create(p, mySrd).getId().toUnqualifiedVersionless();
+			pid5 = myPatientDao.update(p, mySrd).getId().toUnqualifiedVersionless();
 		}
 
 		SearchParameterMap map;
@@ -239,7 +250,8 @@ public class FhirResourceDaoR4SortTest extends BaseJpaR4Test {
 		map = new SearchParameterMap();
 		map.setSort(new SortSpec(Patient.SP_FAMILY, SortOrderEnum.ASC).setChain(new SortSpec(Patient.SP_GIVEN, SortOrderEnum.ASC)));
 		ids = toUnqualifiedVersionlessIds(myPatientDao.search(map));
-		assertThat(ids, contains(pid2, pid4, pid5, pid3, pid1));
+		ourLog.info("** Got IDs: {}", ids);
+		assertThat(ids, contains(pid1, pid2, pid3, pid4, pid5));
 		assertEquals(5, ids.size());
 
 	}
@@ -295,7 +307,7 @@ public class FhirResourceDaoR4SortTest extends BaseJpaR4Test {
 		map.setSort(new SortSpec("gender").setChain(new SortSpec("family", SortOrderEnum.ASC).setChain(new SortSpec("given", SortOrderEnum.ASC))));
 		ids = toUnqualifiedVersionlessIdValues(myPatientDao.search(map));
 		ourLog.info("IDS: {}", ids);
-		assertThat(ids, contains("Patient/AA", "Patient/AB", "Patient/BA", "Patient/BB", "Patient/CA"));
+		assertThat(ids, contains("Patient/CA", "Patient/AA", "Patient/AB", "Patient/BA", "Patient/BB"));
 
 		map = new SearchParameterMap();
 		map.add(Patient.SP_ACTIVE, new TokenParam(null, "true"));

@@ -4,14 +4,14 @@ package ca.uhn.fhir.rest.client.api;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,6 +19,8 @@ package ca.uhn.fhir.rest.client.api;
  * limitations under the License.
  * #L%
  */
+
+import ca.uhn.fhir.util.StopWatch;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,12 +32,6 @@ import java.util.Map;
  * An interface around the HTTP Response.
  */
 public interface IHttpResponse {
-
-	/**
-	 * @deprecated This method was deprecated in HAPI FHIR 2.2 because its name has a typo. Use {@link #bufferEntity()} instead.
-	 */
-	@Deprecated
-	void bufferEntitity() throws IOException;
 
 	/**
 	 * Buffer the message entity data.
@@ -57,7 +53,7 @@ public interface IHttpResponse {
 	 * <p>
 	 * Buffering the message entity data allows for multiple invocations of
 	 * {@code readEntity(...)} methods on the response instance.
-	 * 
+	 *
 	 * @since 2.2
 	 */
 	void bufferEntity() throws IOException;
@@ -65,31 +61,40 @@ public interface IHttpResponse {
 	/**
 	 * Close the response
 	 */
-	public void close();
+	void close();
 
 	/**
-	 * Returna reader for the response entity
+	 * Returns a reader for the response entity
 	 */
-	public Reader createReader() throws IOException;
+	Reader createReader() throws IOException;
 
 	/**
 	 * Get map of the response headers and corresponding string values.
-	 * 
+	 *
 	 * @return response headers as a map header keys and they values.
 	 */
-	public Map<String, List<String>> getAllHeaders();
+	Map<String, List<String>> getAllHeaders();
 
 	/**
-	 * Return all headers in the response with the given type 
+	 * Return all headers in the response with the given type
 	 */
-	public List<String> getHeaders(String theName);
+	List<String> getHeaders(String theName);
 
 	/**
 	 * Extracts {@code Content-Type} value from the response exactly as
 	 * specified by the {@code Content-Type} header. Returns {@code null}
 	 * if not specified.
 	 */
-	public String getMimeType();
+	String getMimeType();
+
+	/**
+	 * @return Returns a StopWatch that was started right before
+	 * the client request was started. The time returned by this
+	 * client includes any time that was spent within the HTTP
+	 * library (possibly including waiting for a connection, and
+	 * any network activity)
+	 */
+	StopWatch getRequestStopWatch();
 
 	/**
 	 * @return the native response, depending on the client library used
@@ -98,21 +103,20 @@ public interface IHttpResponse {
 
 	/**
 	 * Get the status code associated with the response.
-	 * 
+	 *
 	 * @return the response status code.
 	 */
-	public int getStatus();
+	int getStatus();
 
 	/**
 	 * Get the response status information reason phrase associated with the response.
-	 * 
+	 *
 	 * @return the reason phrase.
 	 */
-	public String getStatusInfo();
+	String getStatusInfo();
 
 	/**
 	 * Read the message entity input stream as an InputStream.
 	 */
-	public InputStream readEntity() throws IOException;
-
+	InputStream readEntity() throws IOException;
 }

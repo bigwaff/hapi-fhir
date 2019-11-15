@@ -142,15 +142,20 @@ public class PrePopulatedValidationSupport implements IValidationSupport {
 
   @Override
   public List<StructureDefinition> fetchAllStructureDefinitions(FhirContext theContext) {
-    return new ArrayList<StructureDefinition>(myStructureDefinitions.values());
+    return new ArrayList<>(myStructureDefinitions.values());
   }
 
   @Override
-  public CodeSystem fetchCodeSystem(FhirContext theContext, String theSystem) {
-    return myCodeSystems.get(theSystem);
-  }
+	public CodeSystem fetchCodeSystem(FhirContext theContext, String uri) {
+		return myCodeSystems.get(uri);
+	}
 
-  @SuppressWarnings("unchecked")
+	@Override
+	public ValueSet fetchValueSet(FhirContext theContext, String uri) {
+		return myValueSets.get(uri);
+	}
+
+	@SuppressWarnings("unchecked")
   @Override
   public <T extends IBaseResource> T fetchResource(FhirContext theContext, Class<T> theClass, String theUri) {
     if (theClass.equals(StructureDefinition.class)) {
@@ -176,8 +181,18 @@ public class PrePopulatedValidationSupport implements IValidationSupport {
   }
 
   @Override
-  public CodeValidationResult validateCode(FhirContext theContext, String theCodeSystem, String theCode, String theDisplay) {
+  public CodeValidationResult validateCode(FhirContext theContext, String theCodeSystem, String theCode, String theDisplay, String theValueSetUrl) {
     return null;
   }
+
+	@Override
+	public LookupCodeResult lookupCode(FhirContext theContext, String theSystem, String theCode) {
+		return null;
+	}
+
+	@Override
+	public StructureDefinition generateSnapshot(StructureDefinition theInput, String theUrl, String theName) {
+		return null;
+	}
 
 }

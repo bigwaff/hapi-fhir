@@ -4,14 +4,14 @@ package ca.uhn.fhir.validation;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,7 +25,6 @@ import org.apache.commons.lang3.Validate;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.model.api.IResource;
 import ca.uhn.fhir.validation.schematron.SchematronProvider;
 
 /**
@@ -42,11 +41,11 @@ import ca.uhn.fhir.validation.schematron.SchematronProvider;
  */
 public class FhirValidator {
 
-	private static final String I18N_KEY_NO_PHLOC_ERROR = FhirValidator.class.getName() + ".noPhlocError";
+	private static final String I18N_KEY_NO_PH_ERROR = FhirValidator.class.getName() + ".noPhError";
 
-	private static volatile Boolean ourPhlocPresentOnClasspath;
+	private static volatile Boolean ourPhPresentOnClasspath;
 	private final FhirContext myContext;
-	private List<IValidatorModule> myValidators = new ArrayList<IValidatorModule>();
+	private List<IValidatorModule> myValidators = new ArrayList<>();
 
 	/**
 	 * Constructor (this should not be called directly, but rather {@link FhirContext#newValidator()} should be called to obtain an instance of {@link FhirValidator})
@@ -54,8 +53,8 @@ public class FhirValidator {
 	public FhirValidator(FhirContext theFhirContext) {
 		myContext = theFhirContext;
 
-		if (ourPhlocPresentOnClasspath == null) {
-			ourPhlocPresentOnClasspath = SchematronProvider.isSchematronAvailable(theFhirContext);
+		if (ourPhPresentOnClasspath == null) {
+			ourPhPresentOnClasspath = SchematronProvider.isSchematronAvailable(theFhirContext);
 		}
 	}
 
@@ -96,9 +95,10 @@ public class FhirValidator {
 	 * Should the validator validate the resource against the base schema (the schema provided with the FHIR distribution itself)
 	 */
 	public synchronized boolean isValidateAgainstStandardSchematron() {
-		if (!ourPhlocPresentOnClasspath) {
-			return false; 	// No need to ask since we dont have Phloc. Also Class.forname will complain
-							// about missing phloc import.
+		if (!ourPhPresentOnClasspath) {
+			// No need to ask since we dont have Ph-Schematron. Also Class.forname will complain
+			// about missing ph-schematron import.
+			return false;
 		}
 		Class<? extends IValidatorModule> cls = SchematronProvider.getSchematronValidatorClass();
 		return haveValidatorOfType(cls);
@@ -135,8 +135,11 @@ public class FhirValidator {
 	 * @return Returns a referens to <code>this<code> for method chaining
 	 */
 	public synchronized FhirValidator setValidateAgainstStandardSchematron(boolean theValidateAgainstStandardSchematron) {
-		if (theValidateAgainstStandardSchematron && !ourPhlocPresentOnClasspath) {
-			throw new IllegalArgumentException(myContext.getLocalizer().getMessage(I18N_KEY_NO_PHLOC_ERROR));
+		if (theValidateAgainstStandardSchematron && !ourPhPresentOnClasspath) {
+			throw new IllegalArgumentException(myContext.getLocalizer().getMessage(I18N_KEY_NO_PH_ERROR));
+		}
+		if (!theValidateAgainstStandardSchematron && !ourPhPresentOnClasspath) {
+			return this;
 		}
 		Class<? extends IValidatorModule> cls = SchematronProvider.getSchematronValidatorClass();
 		IValidatorModule instance = SchematronProvider.getSchematronValidatorInstance(myContext);
@@ -163,31 +166,12 @@ public class FhirValidator {
 	private void applyDefaultValidators() {
 		if (myValidators.isEmpty()) {
 			setValidateAgainstStandardSchema(true);
-			if (ourPhlocPresentOnClasspath) {
+			if (ourPhPresentOnClasspath) {
 				setValidateAgainstStandardSchematron(true);
 			}
 		}
 	}
 
-	/**
-	 * Validates a resource instance, throwing a {@link ValidationFailureException} if the validation fails
-	 * 
-	 * @param theResource
-	 *           The resource to validate
-	 * @throws ValidationFailureException
-	 *            If the validation fails
-	 * @deprecated use {@link #validateWithResult(IBaseResource)} instead
-	 */
-	@Deprecated
-	public void validate(IResource theResource) throws ValidationFailureException {
-		
-		applyDefaultValidators();
-		
-		ValidationResult validationResult = validateWithResult(theResource);
-		if (!validationResult.isSuccessful()) {
-			throw new ValidationFailureException(myContext, validationResult.toOperationOutcome());
-		}
-	}
 
 
 	/**
@@ -199,11 +183,37 @@ public class FhirValidator {
 	 * @since 0.7
 	 */
 	public ValidationResult validateWithResult(IBaseResource theResource) {
+		return validateWithResult(theResource, null);
+	}
+
+	/**
+	 * Validates a resource instance returning a {@link ca.uhn.fhir.validation.ValidationResult} which contains the results.
+	 *
+	 * @param theResource
+	 *           the resource to validate
+	 * @return the results of validation
+	 * @since 1.1
+	 */
+	public ValidationResult validateWithResult(String theResource) {
+		return validateWithResult(theResource, null);
+	}
+
+	/**
+	 * Validates a resource instance returning a {@link ca.uhn.fhir.validation.ValidationResult} which contains the results.
+	 *
+	 * @param theResource
+	 *           the resource to validate
+	 * @param theOptions
+	 *       Optionally provides options to the validator
+	 * @return the results of validation
+	 * @since 4.0.0
+	 */
+	public ValidationResult validateWithResult(IBaseResource theResource, ValidationOptions theOptions) {
 		Validate.notNull(theResource, "theResource must not be null");
-		
+
 		applyDefaultValidators();
-		
-		IValidationContext<IBaseResource> ctx = ValidationContext.forResource(myContext, theResource);
+
+		IValidationContext<IBaseResource> ctx = ValidationContext.forResource(myContext, theResource, theOptions);
 
 		for (IValidatorModule next : myValidators) {
 			next.validateResource(ctx);
@@ -217,15 +227,17 @@ public class FhirValidator {
 	 *
 	 * @param theResource
 	 *           the resource to validate
+	 * @param theOptions
+	 *       Optionally provides options to the validator
 	 * @return the results of validation
-	 * @since 1.1
+	 * @since 4.0.0
 	 */
-	public ValidationResult validateWithResult(String theResource) {
+	public ValidationResult validateWithResult(String theResource, ValidationOptions theOptions) {
 		Validate.notNull(theResource, "theResource must not be null");
-		
+
 		applyDefaultValidators();
-		
-		IValidationContext<IBaseResource> ctx = ValidationContext.forText(myContext, theResource);
+
+		IValidationContext<IBaseResource> ctx = ValidationContext.forText(myContext, theResource, theOptions);
 
 		for (IValidatorModule next : myValidators) {
 			next.validateResource(ctx);
@@ -233,5 +245,4 @@ public class FhirValidator {
 
 		return ctx.toResult();
 	}
-
 }

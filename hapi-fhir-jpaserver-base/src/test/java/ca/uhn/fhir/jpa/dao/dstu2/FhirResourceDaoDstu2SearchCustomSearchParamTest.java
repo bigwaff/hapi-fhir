@@ -1,8 +1,9 @@
 package ca.uhn.fhir.jpa.dao.dstu2;
 
 import ca.uhn.fhir.jpa.dao.DaoConfig;
-import ca.uhn.fhir.jpa.dao.SearchParameterMap;
-import ca.uhn.fhir.jpa.entity.ResourceIndexedSearchParamToken;
+import ca.uhn.fhir.jpa.model.entity.ModelConfig;
+import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamToken;
+import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.model.api.ExtensionDt;
 import ca.uhn.fhir.model.api.Include;
 import ca.uhn.fhir.model.dstu2.composite.CodeableConceptDt;
@@ -13,16 +14,13 @@ import ca.uhn.fhir.model.dstu2.valueset.*;
 import ca.uhn.fhir.model.primitive.*;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.param.*;
+import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 import ca.uhn.fhir.util.TestUtil;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.*;
 import org.mockito.internal.util.collections.ListUtil;
-import org.thymeleaf.util.ListUtils;
 
 import java.util.List;
 
@@ -35,8 +33,14 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 	@Before
 	public void beforeDisableResultReuse() {
 		myDaoConfig.setReuseCachedSearchResultsForMillis(null);
-		myDaoConfig.setDefaultSearchParamsCanBeOverridden(new DaoConfig().isDefaultSearchParamsCanBeOverridden());
+		myDaoConfig.setDefaultSearchParamsCanBeOverridden(new ModelConfig().isDefaultSearchParamsCanBeOverridden());
 	}
+
+	@After
+	public void after() {
+		myDaoConfig.setValidateSearchParameterExpressionsOnSave(new DaoConfig().isValidateSearchParameterExpressionsOnSave());
+	}
+
 
 	@Test
 	public void testCreateInvalidNoBase() {
@@ -54,92 +58,30 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		}
 	}
 
-
-
-
 	@Test
-	public void testOverrideAndDisableBuiltInSearchParametersWithOverridingEnabled() {
-		myDaoConfig.setDefaultSearchParamsCanBeOverridden(true);
+	public void testIndexFailsIfInvalidSearchParameterExists() {
+		myDaoConfig.setValidateSearchParameterExpressionsOnSave(false);
 
-		SearchParameter memberSp = new SearchParameter();
-		memberSp.setCode("member");
-		memberSp.setBase(ResourceTypeEnum.GROUP);
-		memberSp.setType(SearchParamTypeEnum.REFERENCE);
-		memberSp.setXpath("Group.member.entity");
-		memberSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
-		memberSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
-		mySearchParameterDao.create(memberSp, mySrd);
+		SearchParameter threadIdSp = new SearchParameter();
+		threadIdSp.setBase(ResourceTypeEnum.COMMUNICATION);
+		threadIdSp.setCode("has-attachments");
+		threadIdSp.setType(SearchParamTypeEnum.REFERENCE);
+		threadIdSp.setXpath("Communication.payload[1].contentAttachment is not null");
+		threadIdSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
+		threadIdSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
+		mySearchParameterDao.create(threadIdSp, mySrd);
+		mySearchParamRegistry.forceRefresh();
 
-		SearchParameter identifierSp = new SearchParameter();
-		identifierSp.setCode("identifier");
-		identifierSp.setBase(ResourceTypeEnum.GROUP);
-		identifierSp.setType(SearchParamTypeEnum.TOKEN);
-		identifierSp.setXpath("Group.identifier");
-		identifierSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
-		identifierSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
-		mySearchParameterDao.create(identifierSp, mySrd);
-
-		mySearchParamRegsitry.forceRefresh();
-
-		Patient p = new Patient();
-		p.addName().addGiven("G");
-		IIdType pid = myPatientDao.create(p).getId().toUnqualifiedVersionless();
-
-		Group g = new Group();
-		g.addIdentifier().setSystem("urn:foo").setValue("bar");
-		g.addMember().getEntity().setReference(pid);
-		myGroupDao.create(g);
-
-		assertThat(myResourceLinkDao.findAll(), empty());
-		assertThat(ListUtil.filter(myResourceIndexedSearchParamTokenDao.findAll(), new ListUtil.Filter<ResourceIndexedSearchParamToken>() {
-			@Override
-			public boolean isOut(ResourceIndexedSearchParamToken object) {
-				return !object.getResourceType().equals("Group") || object.isMissing();
-			}
-		}), empty());
+		Communication com = new Communication();
+		com.setStatus(CommunicationStatusEnum.IN_PROGRESS);
+		try {
+			myCommunicationDao.create(com, mySrd);
+			fail();
+		} catch (InternalErrorException e) {
+			assertThat(e.getMessage(), startsWith("Failed to extract values from resource using FHIRPath \"Communication.payload[1].contentAttachment is not null\": ca.uhn"));
+		}
 	}
 
-	@Test
-	public void testOverrideAndDisableBuiltInSearchParametersWithOverridingDisabled() {
-		myDaoConfig.setDefaultSearchParamsCanBeOverridden(false);
-
-		SearchParameter memberSp = new SearchParameter();
-		memberSp.setCode("member");
-		memberSp.setBase(ResourceTypeEnum.GROUP);
-		memberSp.setType(SearchParamTypeEnum.REFERENCE);
-		memberSp.setXpath("Group.member.entity");
-		memberSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
-		memberSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
-		mySearchParameterDao.create(memberSp, mySrd);
-
-		SearchParameter identifierSp = new SearchParameter();
-		identifierSp.setCode("identifier");
-		identifierSp.setBase(ResourceTypeEnum.GROUP);
-		identifierSp.setType(SearchParamTypeEnum.TOKEN);
-		identifierSp.setXpath("Group.identifier");
-		identifierSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
-		identifierSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
-		mySearchParameterDao.create(identifierSp, mySrd);
-
-		mySearchParamRegsitry.forceRefresh();
-
-		Patient p = new Patient();
-		p.addName().addGiven("G");
-		IIdType pid = myPatientDao.create(p).getId().toUnqualifiedVersionless();
-
-		Group g = new Group();
-		g.addIdentifier().setSystem("urn:foo").setValue("bar");
-		g.addMember().getEntity().setReference(pid);
-		myGroupDao.create(g);
-
-		assertThat(myResourceLinkDao.findAll(), not(empty()));
-		assertThat(ListUtil.filter(myResourceIndexedSearchParamTokenDao.findAll(), new ListUtil.Filter<ResourceIndexedSearchParamToken>() {
-			@Override
-			public boolean isOut(ResourceIndexedSearchParamToken object) {
-				return !object.getResourceType().equals("Group") || object.isMissing();
-			}
-		}), not(empty()));
-	}
 
 	@Test
 	public void testCreateInvalidParamInvalidResourceName() {
@@ -155,23 +97,6 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 			fail();
 		} catch (UnprocessableEntityException e) {
 			assertEquals("Invalid SearchParameter.expression value \"PatientFoo.gender\": Unknown resource name \"PatientFoo\" (this name is not known in FHIR version \"DSTU2\")", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testCreateInvalidParamMismatchedResourceName() {
-		SearchParameter fooSp = new SearchParameter();
-		fooSp.setBase(ResourceTypeEnum.PATIENT);
-		fooSp.setCode("foo");
-		fooSp.setType(SearchParamTypeEnum.TOKEN);
-		fooSp.setXpath("Patient.gender or Observation.code");
-		fooSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
-		fooSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
-		try {
-			mySearchParameterDao.create(fooSp, mySrd);
-			fail();
-		} catch (UnprocessableEntityException e) {
-			assertEquals("Invalid SearchParameter.expression value \"Observation.code\". All paths in a single SearchParameter must match the same resource type", e.getMessage());
 		}
 	}
 
@@ -228,7 +153,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 	}
 
 	@Test
-	public void testCustomReferenceParameter() throws Exception {
+	public void testCustomReferenceParameter() {
 		SearchParameter sp = new SearchParameter();
 		sp.setBase(ResourceTypeEnum.PATIENT);
 		sp.setCode("myDoctor");
@@ -237,6 +162,8 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		sp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
 		sp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(sp);
+
+		mySearchParamRegistry.forceRefresh();
 
 		Practitioner pract = new Practitioner();
 		pract.setId("A");
@@ -267,7 +194,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		eyeColourSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(eyeColourSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient p1 = new Patient();
 		p1.setActive(true);
@@ -288,7 +215,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		attendingSp.addTarget(ResourceTypeEnum.PRACTITIONER);
 		IIdType spId = mySearchParameterDao.create(attendingSp, mySrd).getId().toUnqualifiedVersionless();
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Practitioner p1 = new Practitioner();
 		p1.getName().addFamily("P1");
@@ -317,6 +244,90 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 	}
 
 	@Test
+	public void testOverrideAndDisableBuiltInSearchParametersWithOverridingDisabled() {
+		myModelConfig.setDefaultSearchParamsCanBeOverridden(false);
+
+		SearchParameter memberSp = new SearchParameter();
+		memberSp.setCode("member");
+		memberSp.setBase(ResourceTypeEnum.GROUP);
+		memberSp.setType(SearchParamTypeEnum.REFERENCE);
+		memberSp.setXpath("Group.member.entity");
+		memberSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
+		memberSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
+		mySearchParameterDao.create(memberSp, mySrd);
+
+		SearchParameter identifierSp = new SearchParameter();
+		identifierSp.setCode("identifier");
+		identifierSp.setBase(ResourceTypeEnum.GROUP);
+		identifierSp.setType(SearchParamTypeEnum.TOKEN);
+		identifierSp.setXpath("Group.identifier");
+		identifierSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
+		identifierSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
+		mySearchParameterDao.create(identifierSp, mySrd);
+
+		mySearchParamRegistry.forceRefresh();
+
+		Patient p = new Patient();
+		p.addName().addGiven("G");
+		IIdType pid = myPatientDao.create(p).getId().toUnqualifiedVersionless();
+
+		Group g = new Group();
+		g.addIdentifier().setSystem("urn:foo").setValue("bar");
+		g.addMember().getEntity().setReference(pid);
+		myGroupDao.create(g);
+
+		assertThat(myResourceLinkDao.findAll(), not(empty()));
+		assertThat(ListUtil.filter(myResourceIndexedSearchParamTokenDao.findAll(), new ListUtil.Filter<ResourceIndexedSearchParamToken>() {
+			@Override
+			public boolean isOut(ResourceIndexedSearchParamToken object) {
+				return !object.getResourceType().equals("Group") || object.isMissing();
+			}
+		}), not(empty()));
+	}
+
+	@Test
+	public void testOverrideAndDisableBuiltInSearchParametersWithOverridingEnabled() {
+		myModelConfig.setDefaultSearchParamsCanBeOverridden(true);
+
+		SearchParameter memberSp = new SearchParameter();
+		memberSp.setCode("member");
+		memberSp.setBase(ResourceTypeEnum.GROUP);
+		memberSp.setType(SearchParamTypeEnum.REFERENCE);
+		memberSp.setXpath("Group.member.entity");
+		memberSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
+		memberSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
+		mySearchParameterDao.create(memberSp, mySrd);
+
+		SearchParameter identifierSp = new SearchParameter();
+		identifierSp.setCode("identifier");
+		identifierSp.setBase(ResourceTypeEnum.GROUP);
+		identifierSp.setType(SearchParamTypeEnum.TOKEN);
+		identifierSp.setXpath("Group.identifier");
+		identifierSp.setXpathUsage(XPathUsageTypeEnum.NORMAL);
+		identifierSp.setStatus(ConformanceResourceStatusEnum.RETIRED);
+		mySearchParameterDao.create(identifierSp, mySrd);
+
+		mySearchParamRegistry.forceRefresh();
+
+		Patient p = new Patient();
+		p.addName().addGiven("G");
+		IIdType pid = myPatientDao.create(p).getId().toUnqualifiedVersionless();
+
+		Group g = new Group();
+		g.addIdentifier().setSystem("urn:foo").setValue("bar");
+		g.addMember().getEntity().setReference(pid);
+		myGroupDao.create(g);
+
+		assertThat(myResourceLinkDao.findAll(), empty());
+		assertThat(ListUtil.filter(myResourceIndexedSearchParamTokenDao.findAll(), new ListUtil.Filter<ResourceIndexedSearchParamToken>() {
+			@Override
+			public boolean isOut(ResourceIndexedSearchParamToken object) {
+				return !object.getResourceType().equals("Group") || object.isMissing();
+			}
+		}), empty());
+	}
+
+	@Test
 	public void testSearchForExtensionReferenceWithNonMatchingTarget() {
 		SearchParameter siblingSp = new SearchParameter();
 		siblingSp.setBase(ResourceTypeEnum.PATIENT);
@@ -328,7 +339,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.addTarget(ResourceTypeEnum.ORGANIZATION);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient p1 = new Patient();
 		p1.addName().addFamily("P1");
@@ -371,7 +382,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.addTarget(ResourceTypeEnum.PATIENT);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient p1 = new Patient();
 		p1.addName().addFamily("P1");
@@ -424,7 +435,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient p1 = new Patient();
 		p1.addName().addFamily("P1");
@@ -478,7 +489,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		eyeColourSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(eyeColourSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient p1 = new Patient();
 		p1.setActive(true);
@@ -511,7 +522,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.addTarget(ResourceTypeEnum.ORGANIZATION);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient patient = new Patient();
 		patient.addName().addFamily("P2");
@@ -547,7 +558,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.addTarget(ResourceTypeEnum.ORGANIZATION);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient patient = new Patient();
 		patient.addName().addFamily("P2");
@@ -583,7 +594,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Appointment apt = new Appointment();
 		apt.setStatus(AppointmentStatusEnum.ARRIVED);
@@ -624,7 +635,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient patient = new Patient();
 		patient.addName().addFamily("P2");
@@ -660,7 +671,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient patient = new Patient();
 		patient.addName().addFamily("P2");
@@ -697,7 +708,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.addTarget(ResourceTypeEnum.APPOINTMENT);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Appointment apt = new Appointment();
 		apt.setStatus(AppointmentStatusEnum.ARRIVED);
@@ -736,7 +747,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Appointment apt = new Appointment();
 		apt.setStatus(AppointmentStatusEnum.ARRIVED);
@@ -778,7 +789,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.addTarget(ResourceTypeEnum.OBSERVATION);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Appointment apt = new Appointment();
 		apt.setStatus(AppointmentStatusEnum.ARRIVED);
@@ -819,7 +830,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		siblingSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		mySearchParameterDao.create(siblingSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient patient = new Patient();
 		patient.addName().addFamily("P2");
@@ -856,7 +867,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		fooSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		IIdType spId = mySearchParameterDao.create(fooSp, mySrd).getId().toUnqualifiedVersionless();
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient pat = new Patient();
 		pat.addIdentifier().setSystem("FOO123").setValue("BAR678");
@@ -901,7 +912,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		IIdType spId = mySearchParameterDao.create(fooSp, mySrd).getId().toUnqualifiedVersionless();
 
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient pat = new Patient();
 		pat.addIdentifier().setSystem("http://AAA").setValue("BAR678");
@@ -946,7 +957,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		fooSp.setStatus(ConformanceResourceStatusEnum.ACTIVE);
 		IIdType spId = mySearchParameterDao.create(fooSp, mySrd).getId().toUnqualifiedVersionless();
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient pat = new Patient();
 		pat.setGender(AdministrativeGenderEnum.MALE);
@@ -977,8 +988,10 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		// Delete the param
 		mySearchParameterDao.delete(spId, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
-		mySystemDao.performReindexingPass(100);
+		mySearchParamRegistry.forceRefresh();
+		myResourceReindexingSvc.markAllResourcesForReindexing();
+		myResourceReindexingSvc.forceReindexingPass();
+		myResourceReindexingSvc.forceReindexingPass();
 
 		// Try with custom gender SP
 		map = new SearchParameterMap();
@@ -1003,7 +1016,7 @@ public class FhirResourceDaoDstu2SearchCustomSearchParamTest extends BaseJpaDstu
 		fooSp.setStatus(ConformanceResourceStatusEnum.DRAFT);
 		mySearchParameterDao.create(fooSp, mySrd);
 
-		mySearchParamRegsitry.forceRefresh();
+		mySearchParamRegistry.forceRefresh();
 
 		Patient pat = new Patient();
 		pat.setGender(AdministrativeGenderEnum.MALE);

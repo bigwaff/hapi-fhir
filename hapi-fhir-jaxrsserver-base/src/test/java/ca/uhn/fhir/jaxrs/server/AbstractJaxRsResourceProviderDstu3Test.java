@@ -1,11 +1,20 @@
 package ca.uhn.fhir.jaxrs.server;
 
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
-
-import java.util.*;
-
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.jaxrs.client.JaxRsRestfulClientFactory;
+import ca.uhn.fhir.jaxrs.server.interceptor.JaxRsResponseException;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsConformanceRestProviderDstu3;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsMockPageProviderDstu3;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsMockPatientRestProviderDstu3;
+import ca.uhn.fhir.model.primitive.UriDt;
+import ca.uhn.fhir.rest.api.*;
+import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
+import ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor;
+import ca.uhn.fhir.rest.param.StringAndListParam;
+import ca.uhn.fhir.rest.param.StringParam;
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
+import ca.uhn.fhir.util.TestUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -16,22 +25,23 @@ import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.junit.*;
 import org.junit.runners.MethodSorters;
-import org.mockito.*;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Matchers;
 
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.jaxrs.client.JaxRsRestfulClientFactory;
-import ca.uhn.fhir.jaxrs.server.interceptor.JaxRsExceptionInterceptor;
-import ca.uhn.fhir.jaxrs.server.interceptor.JaxRsResponseException;
-import ca.uhn.fhir.jaxrs.server.test.*;
-import ca.uhn.fhir.model.primitive.UriDt;
-import ca.uhn.fhir.rest.api.*;
-import ca.uhn.fhir.rest.client.api.IGenericClient;
-import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
-import ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor;
-import ca.uhn.fhir.rest.param.StringAndListParam;
-import ca.uhn.fhir.rest.param.StringParam;
-import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
-import ca.uhn.fhir.util.TestUtil;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.*;
+
+import ca.uhn.fhir.test.utilities.JettyUtil;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class AbstractJaxRsResourceProviderDstu3Test {
@@ -56,7 +66,8 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 	}
 	
 	@AfterClass
-	public static void afterClassClearContext() {
+	public static void afterClassClearContext() throws Exception {
+        JettyUtil.closeServer(jettyServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
@@ -135,7 +146,7 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 	@Test
 	public void testConformance() {
 		final CapabilityStatement conf = client.fetchConformance().ofType(CapabilityStatement.class).execute();
-		assertEquals(conf.getRest().get(0).getResource().get(0).getType().toString(), "Patient");
+		assertEquals(conf.getRest().get(0).getResource().get(0).getType(), "Patient");
 	}
 
 	@Test
@@ -149,7 +160,7 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 		client.setEncoding(EncodingEnum.JSON);
 		final MethodOutcome response = client.create().resource(toCreate).prefer(PreferReturnEnum.REPRESENTATION)
 				.execute();
-		IBaseResource resource = (IBaseResource) response.getResource();
+		IBaseResource resource = response.getResource();
 		compareResultId(1, resource);
 		assertEquals("myIdentifier", patientCaptor.getValue().getIdentifier().get(0).getValue());
 	}
@@ -162,7 +173,7 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 	}
 	
     @Test
-    public void testConditionalDelete() throws Exception {
+    public void testConditionalDelete() {
         when(mock.delete(idCaptor.capture(), conditionalCaptor.capture())).thenReturn(new MethodOutcome());
         client.delete().resourceConditionalByType("Patient").where(Patient.IDENTIFIER.exactly().identifier("2")).execute();
         assertEquals("Patient?identifier=2&_format=json", conditionalCaptor.getValue());
@@ -187,7 +198,7 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 		assertEquals("outputValue", ((StringType)outParams.getParameter().get(0).getValue()).getValueAsString());
 	}
 	
-	class StringTypeMatcher extends ArgumentMatcher<StringType> {
+	class StringTypeMatcher implements ArgumentMatcher<StringType> {
 	    private StringType myStringType;
 	    
 	    public StringTypeMatcher(StringType stringType) {
@@ -195,8 +206,8 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 	    }
 	    
         @Override
-        public boolean matches(Object argument) {
-            return myStringType.getValue().equals(((StringType)argument).getValue());
+        public boolean matches(StringType argument) {
+            return myStringType.getValue().equals(argument.getValue());
         }
 	    
 	}
@@ -214,15 +225,16 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 		inParams.addParameter().setName("dummy").setValue(new StringType("myAwesomeDummyValue"));
 
 		// invoke
-		Parameters outParams = client.operation().onInstance(new IdType("Patient", "1")).named("$someCustomOperation")
-				.withParameters(inParams).useHttpGet().execute();
+		Parameters outParams = client
+			.operation()
+			.onInstance(new IdType("Patient", "1"))
+			.named("$someCustomOperation")
+			.withParameters(inParams)
+			.useHttpGet()
+			.execute();
+
 		// verify
 		assertEquals("outputValue", ((StringType)outParams.getParameter().get(0).getValue()).getValueAsString());
-	}
-
-	/** Search using other query options */
-	public void testOther() {
-		// missing
 	}
 
 	@Test
@@ -236,7 +248,7 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 
 	/** Search - Compartments */
 	@Test
-	public void testSearchCompartements() {
+	public void testSearchCompartments() {
 		when(mock.searchCompartment(any(IdType.class))).thenReturn(Arrays.asList((IBaseResource) createPatient(1)));
 		org.hl7.fhir.dstu3.model.Bundle response = client.search().forResource(Patient.class).withIdAndCompartment("1", "Condition")
 				.returnBundle(org.hl7.fhir.dstu3.model.Bundle.class).execute();
@@ -248,7 +260,7 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 	/** */
 	@Test
 	public void testSearchPost() {
-		when(mock.search(any(StringParam.class), Matchers.isNull(StringAndListParam.class)))
+		when(mock.search(ArgumentMatchers.isNull(), ArgumentMatchers.isNull()))
 				.thenReturn(createPatients(1, 13));
 		org.hl7.fhir.dstu3.model.Bundle result = client.search().forResource("Patient").usingStyle(SearchStyleEnum.POST)
 				.returnBundle(org.hl7.fhir.dstu3.model.Bundle.class).execute();
@@ -275,12 +287,12 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 	/** Search - Multi-valued Parameters (ANY/OR) */
 	@Test
 	public void testSearchUsingGenericClientBySearchWithMultiValues() {
-		when(mock.search(any(StringParam.class), Matchers.isNotNull(StringAndListParam.class)))
+		when(mock.search(any(StringParam.class), ArgumentMatchers.notNull()))
 				.thenReturn(Arrays.asList(createPatient(1)));
 		final Bundle results = client.search().forResource(Patient.class)
 				.where(Patient.ADDRESS.matches().values("Toronto")).and(Patient.ADDRESS.matches().values("Ontario"))
 				.and(Patient.ADDRESS.matches().values("Canada"))
-				.where(Patient.IDENTIFIER.exactly().systemAndIdentifier("SHORTNAME", "TOYS")).returnBundle(Bundle.class).execute();
+				.where(Patient.NAME.matches().value("SHORTNAME")).returnBundle(Bundle.class).execute();
 		IBaseResource resource = results.getEntry().get(0).getResource();
 
 		compareResultId(1, resource);
@@ -291,7 +303,7 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 	@Test
 	public void testSearchWithPaging() {
 		// Perform a search
-		when(mock.search(any(StringParam.class), Matchers.isNull(StringAndListParam.class)))
+		when(mock.search(ArgumentMatchers.isNull(), ArgumentMatchers.isNull()))
 				.thenReturn(createPatients(1, 13));
 		final org.hl7.fhir.dstu3.model.Bundle results = client.search().forResource(Patient.class).count(8).returnBundle(org.hl7.fhir.dstu3.model.Bundle.class)
 				.execute();
@@ -410,26 +422,25 @@ public class AbstractJaxRsResourceProviderDstu3Test {
 
 	@BeforeClass
 	public static void setUpClass() throws Exception {
-		ourPort = RandomServerPortProvider.findFreePort();
 		ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
 		context.setContextPath("/");
-		System.out.println(ourPort);
-		jettyServer = new Server(ourPort);
+		jettyServer = new Server(0);
 		jettyServer.setHandler(context);
-		ServletHolder jerseyServlet = context.addServlet(org.glassfish.jersey.servlet.ServletContainer.class, "/*");
+		ServletHolder jerseyServlet = context.addServlet(org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher.class, "/*");
 		jerseyServlet.setInitOrder(0);
 
 		//@formatter:off
-		jerseyServlet.setInitParameter("jersey.config.server.provider.classnames",
+		jerseyServlet.setInitParameter("resteasy.resources",
 				StringUtils.join(Arrays.asList(
 					TestJaxRsMockPatientRestProviderDstu3.class.getCanonicalName(),
-					JaxRsExceptionInterceptor.class.getCanonicalName(),
+//					JaxRsExceptionInterceptor.class.getCanonicalName(),
 					TestJaxRsConformanceRestProviderDstu3.class.getCanonicalName(),
 					TestJaxRsMockPageProviderDstu3.class.getCanonicalName()
-						), ";"));
+						), ","));
 		//@formatter:on
 		
-		jettyServer.start();
+		JettyUtil.startServer(jettyServer);
+        ourPort = JettyUtil.getPortForStartedServer(jettyServer);
 
 		ourCtx.setRestfulClientFactory(new JaxRsRestfulClientFactory(ourCtx));
 		ourCtx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
@@ -438,15 +449,6 @@ public class AbstractJaxRsResourceProviderDstu3Test {
         client = ourCtx.newRestfulGenericClient(serverBase);
 		client.setEncoding(EncodingEnum.JSON);
 		client.registerInterceptor(new LoggingInterceptor(true));
-	}
-
-	@AfterClass
-	public static void tearDownClass() throws Exception {
-		try {
-			jettyServer.destroy();
-		} catch (Exception e) {
-
-		}
 	}
 
 }

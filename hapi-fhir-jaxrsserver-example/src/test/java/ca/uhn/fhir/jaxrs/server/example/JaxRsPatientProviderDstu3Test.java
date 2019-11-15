@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import java.util.Arrays;
 import java.util.List;
 
+import ca.uhn.fhir.model.primitive.IdDt;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -19,6 +20,7 @@ import ca.uhn.fhir.rest.api.*;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
 import ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor;
+import ca.uhn.fhir.test.utilities.JettyUtil;
 import ca.uhn.fhir.util.TestUtil;
 
 public class JaxRsPatientProviderDstu3Test {
@@ -30,30 +32,30 @@ public class JaxRsPatientProviderDstu3Test {
 	private static Server jettyServer;
 
 	@AfterClass
-	public static void afterClassClearContext() {
+	public static void afterClassClearContext() throws Exception {
+        JettyUtil.closeServer(jettyServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
 	@BeforeClass
 	public static void setUpClass()
 			throws Exception {
-		ourPort = RandomServerPortProvider.findFreePort();
 		ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
 		context.setContextPath("/");
-		System.out.println(ourPort);
-		jettyServer = new Server(ourPort);
+		jettyServer = new Server(0);
 		jettyServer.setHandler(context);
-		ServletHolder jerseyServlet = context.addServlet(org.glassfish.jersey.servlet.ServletContainer.class, "/*");
+		ServletHolder jerseyServlet = context.addServlet(org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher.class, "/*");
 		jerseyServlet.setInitOrder(0);
 		//@formatter:off
-		jerseyServlet.setInitParameter("jersey.config.server.provider.classnames",
+		jerseyServlet.setInitParameter("resteasy.resources",
 				StringUtils.join(Arrays.asList(
 						JaxRsConformanceProviderDstu3.class.getCanonicalName(),
 						JaxRsPatientRestProviderDstu3.class.getCanonicalName(), 
 						JaxRsPageProviderDstu3.class.getCanonicalName()
-					), ";"));
+					), ","));
 		//@formatter:on
-		jettyServer.start();
+		JettyUtil.startServer(jettyServer);
+        ourPort = JettyUtil.getPortForStartedServer(jettyServer);
 
 		ourCtx.setRestfulClientFactory(new JaxRsRestfulClientFactory(ourCtx));
 		ourCtx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
@@ -61,16 +63,6 @@ public class JaxRsPatientProviderDstu3Test {
 		client = ourCtx.newRestfulGenericClient("http://localhost:" + ourPort + "/");
 		client.setEncoding(EncodingEnum.JSON);
 		client.registerInterceptor(new LoggingInterceptor(true));
-	}
-
-	@AfterClass
-	public static void tearDownClass()
-			throws Exception {
-		try {
-			jettyServer.destroy();
-		}
-		catch (Exception e) {
-		}
 	}
 
     /** Search/Query - Type */
@@ -106,11 +98,6 @@ public class JaxRsPatientProviderDstu3Test {
             final Bundle nextPage = client.loadPage().next(results).execute();
             System.out.println(nextPage.getEntry().size());
         }
-    }
-    
-    /** Search using other query options */
-    public void testOther() {
-        //missing
     }
     
     /** */ 
@@ -298,5 +285,17 @@ public class JaxRsPatientProviderDstu3Test {
         final Patient patient = client.read(Patient.class, "1");
         System.out.println(patient);
     }
+
+	@Test
+	public void testInstanceHistory() {
+		final Bundle history = client.history().onInstance(new IdDt("Patient", 1L)).returnBundle(Bundle.class).execute();
+		assertEquals("myTestId", history.getIdElement().getIdPart());
+	}
+
+	@Test
+	public void testTypeHistory() {
+		final Bundle history = client.history().onType(Patient.class).returnBundle(Bundle.class).execute();
+		assertEquals("myTestId", history.getIdElement().getIdPart());
+	}
 
 }

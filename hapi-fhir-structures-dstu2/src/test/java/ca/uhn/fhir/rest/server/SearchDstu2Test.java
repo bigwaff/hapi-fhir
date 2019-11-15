@@ -1,21 +1,28 @@
 package ca.uhn.fhir.rest.server;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.startsWith;
-import static org.hamcrest.Matchers.stringContainsInOrder;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
-
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.model.api.IResource;
+import ca.uhn.fhir.model.dstu2.composite.IdentifierDt;
+import ca.uhn.fhir.model.dstu2.resource.Bundle;
+import ca.uhn.fhir.model.dstu2.resource.Bundle.Link;
+import ca.uhn.fhir.model.dstu2.resource.Patient;
+import ca.uhn.fhir.model.primitive.InstantDt;
+import ca.uhn.fhir.rest.annotation.*;
+import ca.uhn.fhir.rest.api.Constants;
+import ca.uhn.fhir.rest.api.EncodingEnum;
+import ca.uhn.fhir.rest.api.MethodOutcome;
+import ca.uhn.fhir.rest.api.server.IBundleProvider;
+import ca.uhn.fhir.rest.param.*;
+import ca.uhn.fhir.util.TestUtil;
+import com.google.common.base.Charsets;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.*;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -26,21 +33,23 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.model.api.IResource;
-import ca.uhn.fhir.model.dstu2.composite.IdentifierDt;
-import ca.uhn.fhir.model.dstu2.resource.Bundle;
-import ca.uhn.fhir.model.dstu2.resource.Bundle.Link;
-import ca.uhn.fhir.model.dstu2.resource.Patient;
-import ca.uhn.fhir.model.primitive.InstantDt;
-import ca.uhn.fhir.rest.annotation.*;
-import ca.uhn.fhir.rest.api.Constants;
-import ca.uhn.fhir.rest.api.MethodOutcome;
-import ca.uhn.fhir.rest.api.server.IBundleProvider;
-import ca.uhn.fhir.rest.param.*;
-import ca.uhn.fhir.util.*;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.*;
+
+import ca.uhn.fhir.test.utilities.JettyUtil;
+
+import javax.annotation.Nonnull;
 
 public class SearchDstu2Test {
 
@@ -142,14 +151,14 @@ public class SearchDstu2Test {
 		ourLog.info(responseContent);
 
 		assertEquals(200, status.getStatusLine().getStatusCode());
-		assertThat(responseContent, PatternMatcher.pattern("id value..[0-9a-f-]+\\\""));
+		assertThat(responseContent, matchesPattern(".*id value..[0-9a-f-]+\\\".*"));
 	}
 
 	@Test
 	public void testSearchBlacklist01Failing() throws Exception {
 		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_query=searchBlacklist01&ref.black1=value");
 		HttpResponse status = ourClient.execute(httpGet);
-		String responseContent = IOUtils.toString(status.getEntity().getContent());
+		String responseContent = IOUtils.toString(status.getEntity().getContent(), Charsets.UTF_8);
 		IOUtils.closeQuietly(status.getEntity().getContent());
 		ourLog.info(responseContent);
 		assertEquals(400, status.getStatusLine().getStatusCode());
@@ -159,7 +168,7 @@ public class SearchDstu2Test {
 	public void testSearchBlacklist01Passing() throws Exception {
 		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_query=searchBlacklist01&ref.white1=value");
 		HttpResponse status = ourClient.execute(httpGet);
-		String responseContent = IOUtils.toString(status.getEntity().getContent());
+		String responseContent = IOUtils.toString(status.getEntity().getContent(), Charsets.UTF_8);
 		IOUtils.closeQuietly(status.getEntity().getContent());
 		ourLog.info(responseContent);
 		assertEquals(200, status.getStatusLine().getStatusCode());
@@ -396,6 +405,70 @@ public class SearchDstu2Test {
 		assertEquals("Patient", ourLastRef.getResourceType());
 	}
 
+	/**
+	 * Verifies proper method binding to handle special search names(_id:[modifier], _language:[modifier])
+	 */
+	@Test
+	public void testSearchByIdExact() throws Exception {
+		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_id:exact=aaa&reference=value");
+		HttpResponse status = ourClient.execute(httpGet);
+		String responseContent = IOUtils.toString(status.getEntity().getContent(), Charset.defaultCharset());
+		IOUtils.closeQuietly(status.getEntity().getContent());
+		ourLog.info(responseContent);
+		assertEquals(200, status.getStatusLine().getStatusCode());
+
+		assertEquals("idProvider", ourLastMethod);
+	}
+
+	@Test
+	public void testSearchByQualifiedIdQualifiedString() throws Exception {
+		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_id:exact=aaa&stringParam:exact=value");
+		HttpResponse status = ourClient.execute(httpGet);
+		String responseContent = IOUtils.toString(status.getEntity().getContent(), Charset.defaultCharset());
+		IOUtils.closeQuietly(status.getEntity().getContent());
+		ourLog.info(responseContent);
+		assertEquals(200, status.getStatusLine().getStatusCode());
+
+		assertEquals("stringParam:true:true", ourLastMethod);
+	}
+
+	@Test
+	public void testSearchByQualifiedString() throws Exception {
+		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_id=aaa&stringParam:exact=value");
+		HttpResponse status = ourClient.execute(httpGet);
+		String responseContent = IOUtils.toString(status.getEntity().getContent(), Charset.defaultCharset());
+		IOUtils.closeQuietly(status.getEntity().getContent());
+		ourLog.info(responseContent);
+		assertEquals(200, status.getStatusLine().getStatusCode());
+
+		assertEquals("stringParam:false:true", ourLastMethod);
+	}
+
+	@Test
+	public void testSearchByQualifiedIdString() throws Exception {
+		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_id:exact=aaa&stringParam=value");
+		HttpResponse status = ourClient.execute(httpGet);
+		String responseContent = IOUtils.toString(status.getEntity().getContent(), Charset.defaultCharset());
+		IOUtils.closeQuietly(status.getEntity().getContent());
+		ourLog.info(responseContent);
+		assertEquals(200, status.getStatusLine().getStatusCode());
+
+		assertEquals("stringParam:true:false", ourLastMethod);
+	}
+
+	@Test
+	public void testSearchByIdString() throws Exception {
+		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_id=aaa&stringParam=value");
+		HttpResponse status = ourClient.execute(httpGet);
+		String responseContent = IOUtils.toString(status.getEntity().getContent(), Charset.defaultCharset());
+		IOUtils.closeQuietly(status.getEntity().getContent());
+		ourLog.info(responseContent);
+		assertEquals(200, status.getStatusLine().getStatusCode());
+
+		assertEquals("stringParam:false:false", ourLastMethod);
+	}
+
+
 	@Test
 	public void testSearchWhitelist01Failing() throws Exception {
 		HttpGet httpGet = new HttpGet("http://localhost:" + ourPort + "/Patient?_query=searchWhitelist01&ref=value");
@@ -419,32 +492,51 @@ public class SearchDstu2Test {
 
 	@AfterClass
 	public static void afterClassClearContext() throws Exception {
-		ourServer.stop();
+		JettyUtil.closeServer(ourServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
 	@BeforeClass
 	public static void beforeClass() throws Exception {
-		ourPort = PortUtil.findFreePort();
-		ourServer = new Server(ourPort);
+		ourServer = new Server(0);
 
 		DummyPatientResourceProvider patientProvider = new DummyPatientResourceProvider();
+		DummyPatientResourceNoIdProvider patientResourceNoIdProviderProvider = new DummyPatientResourceNoIdProvider();
 
 		ServletHandler proxyHandler = new ServletHandler();
 		ourServlet = new RestfulServer(ourCtx);
 		ourServlet.setPagingProvider(new FifoMemoryPagingProvider(10));
+		ourServlet.setDefaultResponseEncoding(EncodingEnum.XML);
+		ourServlet.setResourceProviders(patientResourceNoIdProviderProvider, patientProvider);
 
-		ourServlet.setResourceProviders(patientProvider);
 		ServletHolder servletHolder = new ServletHolder(ourServlet);
 		proxyHandler.addServletWithMapping(servletHolder, "/*");
 		ourServer.setHandler(proxyHandler);
-		ourServer.start();
+		JettyUtil.startServer(ourServer);
+        ourPort = JettyUtil.getPortForStartedServer(ourServer);
 
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
 		HttpClientBuilder builder = HttpClientBuilder.create();
 		builder.setConnectionManager(connectionManager);
 		ourClient = builder.build();
 
+	}
+
+	public static class DummyPatientResourceNoIdProvider implements IResourceProvider {
+
+		@Override
+		public Class<? extends IResource> getResourceType() {
+			return Patient.class;
+		}
+
+		//@formatter:off
+		@Search()
+		public List<Patient> searchByRef(
+			@RequiredParam(name = "reference") ReferenceParam theParam) {
+			ourLastMethod = "noIdProvider";
+			return Collections.emptyList();
+		}
+		//@formatter:on
 	}
 
 	public static class DummyPatientResourceProvider implements IResourceProvider {
@@ -470,7 +562,27 @@ public class SearchDstu2Test {
 		public MethodOutcome create(@ResourceParam Patient thePatient) {
 			throw new UnsupportedOperationException();
 		}
-		
+
+		//@formatter:off
+		@Search()
+		public List<Patient> searchByIdRef(
+			@RequiredParam(name="_id") StringParam id,
+			@OptionalParam(name = "reference") ReferenceParam theParam) {
+			ourLastMethod = "idProvider";
+			return Collections.emptyList();
+		}
+		//@formatter:on
+
+		//@formatter:off
+		@Search()
+		public List<Patient> searchByQualifiedString(
+			@RequiredParam(name="_id") StringParam id,
+			@RequiredParam(name = "stringParam") StringParam stringParam) {
+			ourLastMethod = "stringParam:" + id.isExact() + ":" + stringParam.isExact();
+			return Collections.emptyList();
+		}
+		//@formatter:on
+
 		//@formatter:off
 		@Search()
 		public List<Patient> searchDateAndList(
@@ -546,6 +658,7 @@ public class SearchDstu2Test {
 					return ourReturnPublished;
 				}
 
+				@Nonnull
 				@Override
 				public List<IBaseResource> getResources(int theFromIndex, int theToIndex) {
 					throw new IllegalStateException();

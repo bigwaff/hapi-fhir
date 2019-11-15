@@ -4,8 +4,8 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.annotation.*;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.MethodOutcome;
-import ca.uhn.fhir.util.PortUtil;
 import ca.uhn.fhir.util.TestUtil;
+import com.google.common.base.Charsets;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -32,6 +32,8 @@ import org.junit.Test;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
+
+import ca.uhn.fhir.test.utilities.JettyUtil;
 
 public class BinaryServerR4Test {
 	private static CloseableHttpClient ourClient;
@@ -70,10 +72,40 @@ public class BinaryServerR4Test {
 			assertEquals("application/foo", status.getEntity().getContentType().getValue());
 			assertEquals("Patient/1", status.getFirstHeader(Constants.HEADER_X_SECURITY_CONTEXT).getValue());
 			assertEquals("W/\"222\"", status.getFirstHeader(Constants.HEADER_ETAG).getValue());
-			assertEquals("http://localhost:" + ourPort + "/Binary/A/_history/222", status.getFirstHeader(Constants.HEADER_LOCATION).getValue());
+			assertEquals("http://localhost:" + ourPort + "/Binary/A/_history/222", status.getFirstHeader(Constants.HEADER_CONTENT_LOCATION).getValue());
+			assertEquals(null, status.getFirstHeader(Constants.HEADER_LOCATION));
 
 			byte[] content = IOUtils.toByteArray(status.getEntity().getContent());
 			assertArrayEquals(new byte[]{0, 1, 2, 3, 4}, content);
+		} finally {
+			IOUtils.closeQuietly(status);
+		}
+	}
+
+
+	@Test
+	public void testGetWithAccept() throws Exception {
+
+		ourNextBinary = new Binary();
+		ourNextBinary.setId("Binary/A/_history/222");
+		ourNextBinary.setContent(new byte[]{0, 1, 2, 3, 4});
+		ourNextBinary.setSecurityContext(new Reference("Patient/1"));
+		ourNextBinary.setContentType("application/foo");
+
+		HttpGet get = new HttpGet("http://localhost:" + ourPort + "/Binary/A");
+		get.addHeader("Content-Type", "application/foo");
+		get.addHeader("Accept", Constants.CT_FHIR_JSON);
+		CloseableHttpResponse status = ourClient.execute(get);
+		try {
+			assertEquals(200, status.getStatusLine().getStatusCode());
+			assertEquals("application/json+fhir;charset=utf-8", status.getEntity().getContentType().getValue());
+			assertEquals("Patient/1", status.getFirstHeader(Constants.HEADER_X_SECURITY_CONTEXT).getValue());
+			assertEquals("W/\"222\"", status.getFirstHeader(Constants.HEADER_ETAG).getValue());
+			assertEquals("http://localhost:" + ourPort + "/Binary/A/_history/222", status.getFirstHeader(Constants.HEADER_CONTENT_LOCATION).getValue());
+			assertEquals(null, status.getFirstHeader(Constants.HEADER_LOCATION));
+
+			String content = IOUtils.toString(status.getEntity().getContent(), Charsets.UTF_8);
+			assertEquals("{\"resourceType\":\"Binary\",\"id\":\"A\",\"meta\":{\"versionId\":\"222\"},\"contentType\":\"application/foo\",\"securityContext\":{\"reference\":\"Patient/1\"},\"data\":\"AAECAwQ=\"}", content);
 		} finally {
 			IOUtils.closeQuietly(status);
 		}
@@ -195,14 +227,13 @@ public class BinaryServerR4Test {
 
 	@AfterClass
 	public static void afterClassClearContext() throws Exception {
-		ourServer.stop();
+		JettyUtil.closeServer(ourServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
 	@BeforeClass
 	public static void beforeClass() throws Exception {
-		ourPort = PortUtil.findFreePort();
-		ourServer = new Server(ourPort);
+		ourServer = new Server(0);
 
 		BinaryProvider binaryProvider = new BinaryProvider();
 
@@ -212,7 +243,8 @@ public class BinaryServerR4Test {
 		ServletHolder servletHolder = new ServletHolder(servlet);
 		proxyHandler.addServletWithMapping(servletHolder, "/*");
 		ourServer.setHandler(proxyHandler);
-		ourServer.start();
+		JettyUtil.startServer(ourServer);
+        ourPort = JettyUtil.getPortForStartedServer(ourServer);
 
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
 		HttpClientBuilder builder = HttpClientBuilder.create();

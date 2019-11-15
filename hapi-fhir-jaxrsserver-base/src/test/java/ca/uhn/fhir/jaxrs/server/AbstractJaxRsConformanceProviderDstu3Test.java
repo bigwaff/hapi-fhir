@@ -1,27 +1,25 @@
 package ca.uhn.fhir.jaxrs.server;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsMockPatientRestProviderDstu3;
+import ca.uhn.fhir.rest.api.Constants;
+import ca.uhn.fhir.rest.server.IResourceProvider;
+import org.jboss.resteasy.specimpl.ResteasyHttpHeaders;
+import org.junit.Before;
+import org.junit.Test;
 
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.core.*;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import org.glassfish.jersey.internal.MapPropertiesDelegate;
-import org.glassfish.jersey.server.ContainerRequest;
-import org.junit.Before;
-import org.junit.Test;
-
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.jaxrs.server.test.TestJaxRsDummyPatientProvider;
-import ca.uhn.fhir.jaxrs.server.test.TestJaxRsMockPatientRestProviderDstu3;
-import ca.uhn.fhir.rest.api.Constants;
-import ca.uhn.fhir.rest.server.IResourceProvider;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsDummyPatientProviderDstu3;
 
 public class AbstractJaxRsConformanceProviderDstu3Test {
 
@@ -29,16 +27,17 @@ public class AbstractJaxRsConformanceProviderDstu3Test {
 	private static final String REQUESTURI = BASEURI + "/metadata";
 	AbstractJaxRsConformanceProvider provider;
 	private ConcurrentHashMap<Class<? extends IResourceProvider>, IResourceProvider> providers;
-	private ContainerRequest headers;
+	private ResteasyHttpHeaders headers;
 	private MultivaluedHashMap<String, String> queryParameters;
 	
 	@Before
 	public void setUp() throws Exception {
-		// headers
-		headers = new ContainerRequest(new URI(BASEURI), new URI(REQUESTURI), HttpMethod.GET, null,
-				new MapPropertiesDelegate());
 		// uri info
-		queryParameters = new MultivaluedHashMap<String, String>();
+		queryParameters = new MultivaluedHashMap<>();
+		// headers
+//		headers = new ContainerRequest(new URI(BASEURI), new URI(REQUESTURI), HttpMethod.GET, null,
+//				new MapPropertiesDelegate());
+		headers = new ResteasyHttpHeaders(queryParameters);
 		
 		
 		providers = new ConcurrentHashMap<Class<? extends IResourceProvider>, IResourceProvider>();
@@ -48,7 +47,7 @@ public class AbstractJaxRsConformanceProviderDstu3Test {
 	@Test
 	public void testConformance() throws Exception {
 		providers.put(AbstractJaxRsConformanceProvider.class, provider);
-		providers.put(TestJaxRsDummyPatientProvider.class, new TestJaxRsDummyPatientProvider());
+		providers.put(TestJaxRsDummyPatientProviderDstu3.class, new TestJaxRsDummyPatientProviderDstu3());
 		Response response = createConformanceProvider(providers).conformance();
 		System.out.println(response);
 	}
@@ -56,7 +55,7 @@ public class AbstractJaxRsConformanceProviderDstu3Test {
 	@Test
 	public void testConformanceUsingOptions() throws Exception {
 		providers.put(AbstractJaxRsConformanceProvider.class, provider);
-		providers.put(TestJaxRsDummyPatientProvider.class, new TestJaxRsDummyPatientProvider());
+		providers.put(TestJaxRsDummyPatientProviderDstu3.class, new TestJaxRsDummyPatientProviderDstu3());
 		Response response = createConformanceProvider(providers).conformanceUsingOptions();
 		System.out.println(response);
 	}

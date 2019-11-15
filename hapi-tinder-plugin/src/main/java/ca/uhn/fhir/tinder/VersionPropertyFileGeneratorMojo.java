@@ -3,20 +3,25 @@ package ca.uhn.fhir.tinder;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
+import com.google.common.reflect.ClassPath;
 import org.apache.commons.io.IOUtils;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.hl7.fhir.instance.model.api.IBaseDatatype;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.InstantType;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import ca.uhn.fhir.model.api.annotation.DatatypeDef;
 import ca.uhn.fhir.model.api.annotation.ResourceDef;
+import org.springframework.util.Assert;
 
 //@Mojo(name = "generate-version-propertyfile", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class VersionPropertyFileGeneratorMojo extends AbstractMojo {
@@ -34,27 +39,26 @@ public class VersionPropertyFileGeneratorMojo extends AbstractMojo {
 		TreeMap<String, Class<?>> resourceTypes = new TreeMap<>();
 		TreeMap<String, Class<?>> datatypeTypes = new TreeMap<>();
 
-		PathMatchingResourcePatternResolver provider = new PathMatchingResourcePatternResolver();
-		Resource[] components;
+		List<ClassPath.ClassInfo> components = null;
 		try {
-			components = provider.getResources(packageName.replace('.', '/')+ "/*.class");
+			components = ClassPath
+				.from(VersionPropertyFileGeneratorMojo.class.getClassLoader())
+				.getTopLevelClasses()
+				.stream()
+				.filter(t -> {
+					return t.getPackageName().equals(packageName);
+				})
+				.collect(Collectors.toList());
 		} catch (IOException e) {
-			throw new MojoFailureException("Failed to scan classpath", e);
+			throw new MojoFailureException(e.getMessage(), e);
 		}
 
-		for (Resource next : components) {
-			if (next.getFilename().contains("$") || !next.getFilename().endsWith(".class")) {
-				continue;
-			}
-			ourLog.debug("Found candidate: {}", next.getFilename());
-			
-			Class<?> clazz;
-			try {
-				clazz = Class.forName(packageName+ "." + next.getFilename().replace(".class", ""));
-			} catch (ClassNotFoundException e) {
-				throw new MojoFailureException("Failed to instantiate " + next.getFilename());
-			}
-			
+		Assert.isTrue(components.size() > 50, "Only have " + components.size() + " components");
+
+		for (ClassPath.ClassInfo next : components) {
+
+			Class<?> clazz = next.load();
+
 			if (IBaseResource.class.isAssignableFrom(clazz)) {
 				ResourceDef annotation = clazz.getAnnotation(ResourceDef.class);
 				if (annotation == null) {
@@ -90,11 +94,13 @@ public class VersionPropertyFileGeneratorMojo extends AbstractMojo {
 		}
 		
 		ourLog.info("Found {} resources and {} datatypes", resourceTypes.size(), datatypeTypes.size());
+		ourLog.info("Writing propertyfile: {}", targetFile.getAbsolutePath());
 
 		FileWriter w = null;
 		try {
 			w = new FileWriter(targetFile, false);
-			w.write("# This file contains version definitions\n\n");
+			w.write("# This file contains version definitions\n");
+			w.write("# Generated: " + InstantType.now().getValueAsString() + "\n\n");
 			for (Entry<String, Class<?>> nextEntry : resourceTypes.entrySet()) {
 				w.write("resource.");
 				w.write(nextEntry.getKey());
@@ -121,8 +127,8 @@ public class VersionPropertyFileGeneratorMojo extends AbstractMojo {
 	public static void main(String[] theArgs) throws MojoFailureException {
 
 		VersionPropertyFileGeneratorMojo m = new VersionPropertyFileGeneratorMojo();
-		m.packageName = "org.hl7.fhir.r4.model";
-		m.targetFile = new File("../hapi-fhir-structures-r4/src/main/resources/org/hl7/fhir/r4/model/fhirversion.properties");
+		m.packageName = "org.hl7.fhir.r5.model";
+		m.targetFile = new File("hapi-fhir-structures-r5/src/main/resources/org/hl7/fhir/r5/model/fhirversion.properties");
 
 //		m.packageName = "org.hl7.fhir.dstu3.model";
 //		m.targetFile = new File("../hapi-fhir-structures-dstu3/src/main/resources/org/hl7/fhir/dstu3/model/fhirversion.properties");

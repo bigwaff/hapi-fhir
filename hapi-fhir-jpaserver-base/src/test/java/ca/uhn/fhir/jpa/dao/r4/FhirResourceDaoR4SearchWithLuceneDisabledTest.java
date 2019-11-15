@@ -1,14 +1,31 @@
 package ca.uhn.fhir.jpa.dao.r4;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import javax.persistence.EntityManager;
-
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.jpa.bulk.IBulkDataExportSvc;
+import ca.uhn.fhir.jpa.config.TestR4WithLuceneDisabledConfig;
+import ca.uhn.fhir.jpa.dao.*;
+import ca.uhn.fhir.jpa.dao.dstu2.FhirResourceDaoDstu2SearchNoFtTest;
+import ca.uhn.fhir.jpa.search.ISearchCoordinatorSvc;
+import ca.uhn.fhir.jpa.search.reindex.IResourceReindexingSvc;
+import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
+import ca.uhn.fhir.jpa.searchparam.registry.ISearchParamRegistry;
+import ca.uhn.fhir.jpa.sp.ISearchParamPresenceSvc;
+import ca.uhn.fhir.parser.IParser;
+import ca.uhn.fhir.rest.api.EncodingEnum;
+import ca.uhn.fhir.rest.api.server.IBundleProvider;
+import ca.uhn.fhir.rest.param.StringParam;
+import ca.uhn.fhir.rest.param.TokenParam;
+import ca.uhn.fhir.rest.param.TokenParamModifier;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
+import ca.uhn.fhir.util.TestUtil;
+import org.apache.commons.io.IOUtils;
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.hapi.ctx.IValidationSupport;
 import org.hl7.fhir.r4.model.*;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -17,21 +34,29 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
-import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.jpa.config.TestR4WithoutLuceneConfig;
-import ca.uhn.fhir.jpa.dao.*;
-import ca.uhn.fhir.jpa.provider.r4.JpaSystemProviderR4;
-import ca.uhn.fhir.jpa.search.ISearchCoordinatorSvc;
-import ca.uhn.fhir.jpa.sp.ISearchParamPresenceSvc;
-import ca.uhn.fhir.rest.param.StringParam;
-import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
-import ca.uhn.fhir.util.TestUtil;
+import javax.persistence.EntityManager;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = { TestR4WithoutLuceneConfig.class })
+@ContextConfiguration(classes = {TestR4WithLuceneDisabledConfig.class})
 public class FhirResourceDaoR4SearchWithLuceneDisabledTest extends BaseJpaTest {
 	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(FhirResourceDaoR4SearchWithLuceneDisabledTest.class);
-
+	@Autowired
+	protected DaoConfig myDaoConfig;
+	@Autowired
+	protected PlatformTransactionManager myTxManager;
+	@Autowired
+	protected ISearchParamPresenceSvc mySearchParamPresenceSvc;
+	@Autowired
+	protected ISearchCoordinatorSvc mySearchCoordinatorSvc;
+	@Autowired
+	protected ISearchParamRegistry mySearchParamRegistry;
 	@Autowired
 	@Qualifier("myAllergyIntoleranceDaoR4")
 	private IFhirResourceDao<AllergyIntolerance> myAllergyIntoleranceDao;
@@ -51,6 +76,12 @@ public class FhirResourceDaoR4SearchWithLuceneDisabledTest extends BaseJpaTest {
 	@Qualifier("myCodeSystemDaoR4")
 	private IFhirResourceDao<CodeSystem> myCodeSystemDao;
 	@Autowired
+	@Qualifier("myValueSetDaoR4")
+	private IFhirResourceDaoValueSet<ValueSet, ?, ?> myValueSetDao;
+	@Autowired
+	@Qualifier("myObservationDaoR4")
+	private IFhirResourceDao<Observation> myObservationDao;
+	@Autowired
 	@Qualifier("myCompartmentDefinitionDaoR4")
 	private IFhirResourceDao<CompartmentDefinition> myCompartmentDefinitionDao;
 	@Autowired
@@ -59,8 +90,6 @@ public class FhirResourceDaoR4SearchWithLuceneDisabledTest extends BaseJpaTest {
 	@Autowired
 	@Qualifier("myConditionDaoR4")
 	private IFhirResourceDao<Condition> myConditionDao;
-	@Autowired
-	protected DaoConfig myDaoConfig;
 	@Autowired
 	@Qualifier("myDeviceDaoR4")
 	private IFhirResourceDao<Device> myDeviceDao;
@@ -78,25 +107,20 @@ public class FhirResourceDaoR4SearchWithLuceneDisabledTest extends BaseJpaTest {
 	@Autowired
 	@Qualifier("myOrganizationDaoR4")
 	private IFhirResourceDao<Organization> myOrganizationDao;
-
-	@Autowired
-	protected PlatformTransactionManager myTxManager;
-	@Autowired
-	protected ISearchParamPresenceSvc mySearchParamPresenceSvc;
-
 	@Autowired
 	@Qualifier("myJpaValidationSupportChainR4")
 	private IValidationSupport myValidationSupport;
 	@Autowired
-	protected ISearchCoordinatorSvc mySearchCoordinatorSvc;
+	private IFhirSystemDao<Bundle, Meta> mySystemDao;
 	@Autowired
-	protected ISearchParamRegistry mySearchParamRegistry;
+	private IResourceReindexingSvc myResourceReindexingSvc;
+	@Autowired
+	private IBulkDataExportSvc myBulkDataExportSvc;
 
 	@Before
 	@Transactional()
 	public void beforePurgeDatabase() {
-		final EntityManager entityManager = this.myEntityManager;
-		purgeDatabase(entityManager, myTxManager, mySearchParamPresenceSvc, mySearchCoordinatorSvc, mySearchParamRegistry);
+		purgeDatabase(myDaoConfig, mySystemDao, myResourceReindexingSvc, mySearchCoordinatorSvc, mySearchParamRegistry, myBulkDataExportSvc);
 	}
 
 	@Before
@@ -107,22 +131,13 @@ public class FhirResourceDaoR4SearchWithLuceneDisabledTest extends BaseJpaTest {
 	}
 
 	@Override
-	protected FhirContext getContext() {
-		return myFhirCtx;
+	protected PlatformTransactionManager getTxManager() {
+		return myTxManager;
 	}
 
-	@Test
-	public void testSearchWithRegularParam() {
-		String methodName = "testEverythingIncludesBackReferences";
-
-		Organization org = new Organization();
-		org.setName(methodName);
-		IIdType orgId = myOrganizationDao.create(org, mySrd).getId().toUnqualifiedVersionless();
-
-		SearchParameterMap map = new SearchParameterMap();
-		map.add(Organization.SP_NAME, new StringParam(methodName));
-		myOrganizationDao.search(map);
-		
+	@Override
+	protected FhirContext getContext() {
+		return myFhirCtx;
 	}
 
 	@Test
@@ -144,6 +159,20 @@ public class FhirResourceDaoR4SearchWithLuceneDisabledTest extends BaseJpaTest {
 	}
 
 	@Test
+	public void testSearchWithRegularParam() {
+		String methodName = "testEverythingIncludesBackReferences";
+
+		Organization org = new Organization();
+		org.setName(methodName);
+		IIdType orgId = myOrganizationDao.create(org, mySrd).getId().toUnqualifiedVersionless();
+
+		SearchParameterMap map = new SearchParameterMap();
+		map.add(Organization.SP_NAME, new StringParam(methodName));
+		myOrganizationDao.search(map);
+
+	}
+
+	@Test
 	public void testSearchWithText() {
 		String methodName = "testEverythingIncludesBackReferences";
 
@@ -159,6 +188,70 @@ public class FhirResourceDaoR4SearchWithLuceneDisabledTest extends BaseJpaTest {
 		} catch (InvalidRequestException e) {
 			assertEquals("Fulltext search is not enabled on this service, can not process parameter: _text", e.getMessage());
 		}
+	}
+
+	@Test
+	public void testSearchByCodeIn() {
+		CodeSystem cs = new CodeSystem();
+		cs.setUrl("http://fooCS");
+		cs.setContent(CodeSystem.CodeSystemContentMode.COMPLETE);
+		cs.addConcept().setCode("CODEA");
+		cs.addConcept().setCode("CODEB");
+		myCodeSystemDao.create(cs);
+
+		ValueSet vs = new ValueSet();
+		vs.setUrl("http://fooVS");
+		vs.getCompose()
+			.addInclude()
+			.setSystem("http://fooCS")
+			.addConcept(new ValueSet.ConceptReferenceComponent().setCode("CODEA"));
+		myValueSetDao.create(vs);
+
+		Observation obs = new Observation();
+		obs.getCode().addCoding().setSystem("http://fooCS").setCode("CODEA");
+		String obs1id = myObservationDao.create(obs).getId().toUnqualifiedVersionless().getValue();
+
+		obs = new Observation();
+		obs.getCode().addCoding().setSystem("http://fooCS").setCode("CODEB");
+		myObservationDao.create(obs).getId().toUnqualifiedVersionless().getValue();
+
+		SearchParameterMap map = new SearchParameterMap();
+		map.setLoadSynchronous(true);
+		map.add("code", new TokenParam("http://fooVS").setModifier(TokenParamModifier.IN));
+		IBundleProvider results = myObservationDao.search(map);
+		List<IBaseResource> resultsList = results.getResources(0, 10);
+		assertEquals(1, resultsList.size());
+		assertEquals(obs1id, resultsList.get(0).getIdElement().toUnqualifiedVersionless().getValue());
+
+	}
+
+	protected <T extends IBaseResource> T loadResourceFromClasspath(Class<T> type, String resourceName) throws IOException {
+		InputStream stream = FhirResourceDaoDstu2SearchNoFtTest.class.getResourceAsStream(resourceName);
+		if (stream == null) {
+			fail("Unable to load resource: " + resourceName);
+		}
+		String string = IOUtils.toString(stream, StandardCharsets.UTF_8);
+		IParser newJsonParser = EncodingEnum.detectEncodingNoDefault(string).newParser(myFhirCtx);
+		return newJsonParser.parseResource(type, string);
+	}
+
+
+	/**
+	 * A valueset that includes a whole system (i.e. no properties) should expand
+	 */
+	@Test
+	public void testExpandValueSetContainingSystemIncludeWithNoCodes() throws IOException {
+		CodeSystem cs = loadResourceFromClasspath(CodeSystem.class, "/dstu3/iar/CodeSystem-iar-citizenship-status.xml");
+		myCodeSystemDao.create(cs);
+
+		ValueSet vs = loadResourceFromClasspath(ValueSet.class, "/dstu3/iar/ValueSet-iar-citizenship-status.xml");
+		myValueSetDao.create(vs);
+
+		ValueSet expansion = myValueSetDao.expandByIdentifier("http://ccim.on.ca/fhir/iar/ValueSet/iar-citizenship-status", null);
+		ourLog.info(myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(expansion));
+
+		assertEquals(6, expansion.getExpansion().getContains().size());
+
 	}
 
 

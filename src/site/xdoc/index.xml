@@ -17,13 +17,11 @@
 				<br/>
 				<iframe src="https://ghbtns.com/github-btn.html?user=jamesagnew&amp;repo=hapi-fhir&amp;type=fork&amp;count=true&amp;v=2" frameborder="0" scrolling="0" width="100px" height="20px"></iframe>
 				<br/>
-				<a href="https://travis-ci.org/jamesagnew/hapi-fhir"><img src="https://travis-ci.org/jamesagnew/hapi-fhir.svg?branch=master" alt="Build Status"/></a>
+				<a href="https://dev.azure.com/jamesagnew214/jamesagnew214/_build/latest?definitionId=1&amp;branchName=master"><img src="https://dev.azure.com/jamesagnew214/jamesagnew214/_apis/build/status/jamesagnew.hapi-fhir?branchName=master" alt="Build Status"/></a>
 				<br/>
-				<a href="https://coveralls.io/r/jamesagnew/hapi-fhir?branch=master"><img src="https://coveralls.io/repos/jamesagnew/hapi-fhir/badge.svg?branch=master" alt="Coverage Status"/></a>
+				<a href="https://codecov.io/gh/jamesagnew/hapi-fhir"><img src="https://codecov.io/gh/jamesagnew/hapi-fhir/branch/master/graph/badge.svg" alt="Coverage Status"/></a>
 				<br/>
 				<a href="https://maven-badges.herokuapp.com/maven-central/ca.uhn.hapi.fhir/hapi-fhir-base/badge.svg"><img src="https://maven-badges.herokuapp.com/maven-central/ca.uhn.hapi.fhir/hapi-fhir-base/badge.svg" alt="Maven Central"/></a>
-				<br/>
-				<a href="https://www.versioneye.com/user/projects/55e1d0d9c6d8f2001c00043e"><img src="https://www.versioneye.com/user/projects/55e1d0d9c6d8f2001c00043e/badge.svg?style=flat" alt="VersionEye"/></a>
 				<br/>
 				<a href="http://jamesagnew.github.io/hapi-fhir/license.html"><img src="https://img.shields.io/badge/license-apache%202.0-60C060.svg" alt="Apache 2.0 Licensed"/></a>
 			</p>
@@ -46,7 +44,7 @@
 			
 				<p>
 					A public test server is now operating at
-					<a href="http://fhirtest.uhn.ca">http://fhirtest.uhn.ca</a>. 
+					<a href="http://hapi.fhir.org">http://hapi.fhir.org</a>.
 					This server is built entirely using components of HAPI-FHIR
 					and demonstrates all of its capabilities. This server is also
 					entirely open source. You can host your own copy by 
@@ -69,6 +67,452 @@
 		</section>
 
 		<section name="Announcements">
+			<p>
+				<b>November 13, 2019 - HAPI FHIR 4.1.0 (Jitterbug)</b> -
+				It's time for another release of HAPI FHIR!
+			</p>
+			<p>
+				This release brings some good stuff, including:
+			</p>
+			<ul>
+				<li>
+					Structures JARs have been updated to incorporate the latest technical corrections. 
+					DSTU3 structures are upgraded to FHIR 3.0.2, R4 structures are upgraded to 
+					FHIR 4.0.1, and R5 draft structures are upgraded to the October 2019 draft revision.
+				</li>
+				<li>
+					ValueSets are now automatically pre-expanded by the JPA server into
+					a dedicated set of database tables. This "precalculated expansion" is used
+					to provide much better performance for validation and expanion operations, and
+					introduced the ability to successfully expand very large ValueSets
+					such as the LOINC implicit (all codes) valueset.
+				</li>
+				<li>
+					Support for the FHIR Bulk Export specification has been added. We are now
+					working on adding support for Bulk Import!
+				</li>
+				<li>
+					First-order support for ElasticSearch as a full-text and terminology service
+					backend implementation. At this time, both raw Lucene and ElasticSearch are
+					supported (this may change in the future but we do not have any current
+					plans to deprecate Lucene).
+				</li>
+				<li>
+					Live Terminology Service operations for terminology file maintenance based on
+					delta files has been added.
+				</li>
+				<li>
+					Binary resources and Media/DocumentReference instances with binary attachments
+					stored in the FHIR repository can now take advantage of
+					externalized binary storage for the binary content when that feature is enabled.
+					This allows much better scalability of repositories containing large amounts
+					of binary content (e.g. document repositories).
+				</li>
+			</ul>
+			<p>
+				As always, see the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes.
+			</p>
+			<p>
+				Thanks to everyone who contributed to this release!
+			</p>
+			<p>
+				Also, as a reminder, if you have not already filled out our annual
+				user survey, please take a moment to do so. Access the survey here:
+				<a href="http://bit.ly/33HO4cs">http://bit.ly/33HO4cs</a> (note that this URL was originally posted incorrectly. It is now fixed)
+			</p>
+			<p>
+				- <a href="https://github.com/jamesagnew/">James Agnew</a>
+			</p>
+			<br/><br/>
+
+
+
+			<p>
+				<b>September 3, 2019 - Community Survey and HAPI FHIR 4.0.1</b> -
+				It is time for us to do another HAPI FHIR community survey. The survey is a not-quite-annual 
+				tradition that helps us to set priority for the coming year and get a pulse on how people 
+				are using HAPI FHIR.
+			</p>
+			<p>
+				We would very much appreciate if everyone could take a few minutes to fill it out. The 
+				survey is short (2 pages / 5 mins) so it shouldn't be much of a burden.
+			</p>
+			<p>
+				Access the survey here:
+				<a href="http://bit.ly/33HO4cs">http://bit.ly/33HO4cs</a> (note that this URL was originally posted incorrectly. It is now fixed)
+			</p>
+			<p>
+				In addition, a new HAPI FHIR release (4.0.1) has been uploaded to the
+				Maven Central repos.
+				This release contains no new or updated functionality, but addressed a dependency
+            version that was left incorrectly requiring a SNAPSHOT maven build of the
+            org.hl7.fhir.utilities module. Users who are successfully using HAPI FHIR 4.0.0
+            do not need to upgrade, but any users who were blocked from upgrading due to
+            snapshot dependency issues are advised to upgrade immediately.
+			</p>
+
+
+
+			<p>
+				<b>August 14, 2019 - HAPI FHIR 4.0.0 (Igloo) Released</b> -
+				The next release of HAPI has now been uploaded to the Maven repos and
+				GitHub's releases section.
+			</p>
+			<p>
+				This release features a number of significant performance improvements,
+				and has some notable changes:
+			</p>
+			<ul>
+				<li>
+					A new consent framework called ConsentInterceptor that can be used to apply local consent directives and policies, and potentially filter or mask data has been added.
+				</li>
+				<li>
+					Initial support for draft FHIR R5 resources has been added.
+				</li>
+				<li>
+					Support for GraphQL and the _filter search parameter has been added.
+				</li>
+				<li>
+					The ability to perform cascading deletes has been added.
+				</li>
+			</ul>
+			<p>
+				As always, see the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes. You can also <a href="https://youtu.be/0breejA_xe4">watch the release webinar</a>!
+			</p>
+			<p>
+				Thanks to everyone who contributed to this release!
+			</p>
+			<p>
+				- <a href="https://github.com/jamesagnew/">James Agnew</a>
+			</p>
+			<br/><br/>
+
+			<!--
+			<p>
+				<b>May 30, 2019 - HAPI FHIR 3.8.0 (Hippo) Released</b> -
+				The next release of HAPI has now been uploaded to the Maven repos and
+				GitHub's releases section.
+			</p>
+			<p>
+				This release features a number of significant performance improvements,
+				and has some notable changes:
+			</p>
+			<ul>
+				<li>
+					A new interceptor framework has been added. Existing interceptors will continue to work, and no code changes
+					are needed in order to use this new version, but existing interceptors can be modified to use the new
+					framework and can then take advantage of even more functionality. Updated migration documentation will be
+					produced in the coming weeks.
+				</li>
+				<li>
+					A security issue in the hapi-fhir-testpage-overlay (the web-based testing UI that powers
+					<a href="http://hapi.fhir.org">hapi.fhir.org</a> and can be embedded into other applications)
+					has been corrected. Users of this module are recommended to upgrade right away.
+				</li>
+				<li>
+					The
+					<a href="https://github.com/hapifhir/hapi-fhir-jpaserver-starter">hapi-fhir-jpaserver-starter</a>
+					project now uses a properties file for much easier configuration. Please use this project
+					as the basis for any new JPA Server projects, as we are deprecating the existing
+					duplicate
+					<a href="https://github.com/jamesagnew/hapi-fhir/tree/master/hapi-fhir-jpaserver-example">hapi-fhir-jpaserver-example</a>
+					project.
+				</li>
+				<li>
+					A number of improvements have been made to the validator.
+				</li>
+			</ul>
+			<p>
+				As always, see the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes.
+			</p>
+			<p>
+				Thanks to everyone who contributed to this release!
+			</p>
+			<p>
+				- <a href="https://github.com/jamesagnew/">James Agnew</a>
+			</p>
+			<br/><br/>
+
+			<p>
+				<b>Feb 6, 2019 - HAPI FHIR 3.7.0 (Gale) Released</b> -
+				The next release of HAPI has now been uploaded to the Maven repos and
+				GitHub's releases section.
+			</p>
+			<p>
+				This release includes support for the now-completed FHIR R4 release (FHIR 4.0.0).
+				It also brings support for Java 11, along with a big number of bugfixes and
+				new features.
+			</p>
+			<p>
+				As always, see the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes.
+			</p>
+			<p>
+				Thanks to everyone who contributed to this release!
+			</p>
+			<p>
+				- <a href="https://github.com/jamesagnew/">James Agnew</a>
+			</p>
+			<br/><br/>
+
+			<p>
+				<b>Nov 12, 2018 - HAPI FHIR 3.6.0 (Food) Released</b> -
+				The next release of HAPI has now been uploaded to the Maven repos and
+				GitHub's releases section.
+			</p>
+			<p>
+				This release brings us back to our regular 3 month release cycle (although we're
+				only two months after the last release, which was delayed more than we were hoping).
+				This also marks the beginning of codenamed major releases. Our first codename
+				is Food, and we will be following the popular (and admittedly unoriginal) strategy
+				of using the next letter in the alphabet for each release.
+			</p>
+			<p>
+				As always, see the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes. Notable changes include:
+			</p>
+
+			<ul>
+				<li>
+					The FHIR R4 structures have been upgraded to the latest (3.6.0) version of the structures.
+					This marks an exciting (but pointless) milestone that HAPI FHIR and FHIR itself have the
+					same version number!
+				</li>
+				<li>
+					The JPA Server migrator tool has been enhanced so that it is now possible
+					to run a rolling migration from 3.4.0 to 3.6.0 instead of needing to incur
+					a long downtime while the indexes are rebuilt. See <a href="http://hapifhir.io/doc_jpa.html#Migrating_340_to_350">this link</a> for details. In addition, the migrator can now migrate
+					HAPI FHIR 3.3.0 as well. This tool now also operates in a multithreaded way,
+					meaning that it can run migrations much faster in systems with a lot of data.
+				</li>
+				<li>
+					A new custom FHIR operation has been added, allowing subscriptions to be manually
+					triggered/retriggered. This means that it is possible to cause a subscription
+					to process a resource in the database as though that resource had been updated,
+					without actually updating it.
+				</li>
+				<li>
+					The JPA SearchCoordinator now pre-fetches only the first few pages of a search
+					by default instead of pre-fetching all possible results. This makes searches
+					dramatically more efficient in servers where users commonly perform searches
+					that could potentially return many pages but only actually load the first few.
+				</li>
+				<li>
+					A new JPA sample project has been added. This sample has existed for a while, but
+					this is now the offical "reference" project for anyone looking to get started with
+					HAPI FHIR JPA.
+				</li>
+			</ul>
+			<p>
+				Thanks to everyone who contributed to this release!
+			</p>
+			<p>
+				- <a href="https://github.com/jamesagnew/">James Agnew</a>
+			</p>
+			<br/><br/>
+			-->
+
+			
+			<!--
+			<p>
+				<b>Sep 17, 2018 - HAPI FHIR 3.5.0 Released</b> -
+				The next release of HAPI has now been uploaded to the Maven repos and
+				GitHub's releases section.
+			</p>
+			<p>
+				This release is happening a little bit later than we had hoped. This release features
+				a complete reworking of the way that search indexes in the JPA server work, as well
+				as a new database migration tool that can be used to migrate to a new version of
+				HAPI FHIR. Testing these features ended up taking longer than we had hoped, but
+				we think it will be worth the wait.
+			</p>
+			<p>
+				As always, see the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes. Notable changes include:
+			</p>
+
+			<ul>
+				<li>
+					HAPI FHIR now works correctly and is tested on Java 9 and 10, and continues
+					to support Java 8. Java 9 introduces a new module system that meant a lot of
+					additional testing and build tweaks were required in order to get HAPI FHIR
+					working on that platform. Future migrations do not look like they will be
+					as difficult, and we anticipate supporting current release versions of Java
+					as they come out.
+				</li>
+				<li>
+					A new database migration tool has been added to the HAPI FHIR CLI. This tool
+					allows administrators to automatically upgrade an existing database schema from
+					a previous version of HAPI FHIR (currently only HAPI FHIR 3.4.0 is supported)
+					to the latest version. See the
+					<a href="http://hapifhir.io/doc_cli.html#migrate-database">command documentation</a>
+					for more information.
+				</li>
+				<li>
+					The JPA server mechanism for indexing resources has been completely reworked to
+					index based on complex hashes of data. This change should have no user-visible
+					effects, but it does reduce the total size of the database and improve search
+					performance in many cases. It also lays the groundwork for some other features we have
+					planned, including native JPA server multitenancy and column-level encryption.
+				</li>
+				<li>
+					Performance in the JPA server has been significantly improved when fetching large
+					pages of data (e.g. search results or history operations containing 100+
+					resources in one page). This work comes thanks to a collaboration between
+					HAPI FHIR and the US National Institutes for Health (NIH).
+				</li>
+				<li>
+					Support for LOINC has been further improved, thanks to an ongoing collaboration
+					between HAPI FHIR and the Regenstrief Institute.
+				</li>
+			</ul>
+			<p>
+				Note that this version does <b>not</b> include an updated set of FHIR R4 resources. The
+				previous versions are still included. This is because the latest resources have a number 
+				of changes that break the HAPI FHIR build in fairly fundamental ways (e.g. compartment
+				definitions have changes to using a FHIRPath expression that requires a resource resolution,
+				a new validation rule has been added to require narratives across the board, etc.). Work is
+				ongoing on addressing these changes, but as a result we decided to not delay the
+				release any further. A point release should be available soon with updated definitions.
+			</p>
+			<p>
+				Thanks to everyone who contributed to this release!
+			</p>
+			<p>
+				- <a href="https://github.com/jamesagnew/">James Agnew</a>
+			</p>
+			<br/><br/>
+			-->
+
+<!--
+			<p>
+				<b>May 28, 2018 - HAPI FHIR 3.4.0 Released</b> -
+				The next release of HAPI has now been uploaded to the Maven repos and
+				GitHub's releases section.
+			</p>
+			<p>
+				This release brings lots of fixes and some significant enhancements. See the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes. Notable changes include:
+			</p>
+
+			<ul>
+				<li>
+					HAPI FHIR now supports and requires JDK 8. Support for JDK 7 and below has
+					officially been dropped.
+				</li>
+				<li>
+					The R4 draft structures have been updated to the latest versions.
+				</li>
+				<li>
+					Support for LOINC has been significantly improved thanks to a collaboration
+					between the HAPI FHIR project and the Regenstrief Institute. The HAPI FHIR
+					terminology service now imports LOINC parts, ValueSets, ConceptMaps, and all
+					related artifacts.
+				</li>
+				<li>
+					Support for the ConceptMap <![CDATA[<code>$translate</code>]]> method has been
+					implemented, meaning that the terminology service now covers validation as well
+					as translation use cases. Further enhancements are planned. A utility has also
+					been added to the HAPI FHIR CLI for importing and exporting ConceptMaps as
+					CSV files for external editing.
+				</li>
+				<li>
+					Several index table enhancements have been made to the JPA server schema in
+					anticipation of future changes that will improve performance and decrease index
+					sizes. These enhancements consist of new columns that have been added and will be
+					populated in HAPI FHIR 3.4.0 but will not actually be used until HAPI FHIR 3.5.0.
+					Please see the changelog for an upgrade script that should be run.
+				</li>
+				<li>
+					The HAPI FHIR CLI is now available for OSX users using Homebrew.
+				</li>
+				<li>
+					The validation framework has been further harmonized so that DSTU2 resources
+					will now also share the harmonized DSTU3/R4 validation codebase. This
+					has resulted in a significantly more accurate validator
+					for DSTU2 resources.
+				</li>
+				<li>
+					A number of other enhancements have also been made, as well as several significant
+					bugfixes.
+				</li>
+			</ul>
+			<p>
+				Thanks to everyone who contributed to this release!
+			</p>
+			<p>
+				- <a href="https://github.com/dmuylwyk/">Diederik Muylwyk</a>
+			</p>
+			<br/><br/>
+
+
+			<p>
+				<b>Mar 29, 2018 - HAPI FHIR 3.3.0 Released</b> -
+				The next release of HAPI has now been uploaded to the Maven repos and
+				GitHub's releases section.
+			</p>
+			<p>
+				This release brings logs of fixes and some significant enhancements.See the
+				<a href="http://hapifhir.io/changes-report.html">changelog</a> for a full list
+				of changes. Notable changes include:
+			</p>
+
+			<ul>
+				<li>
+					A schema change to the JPA server has been made which will result in
+					significantly less storage space being used and better write performance
+					for repositories which contain a large number of resource, or larger
+					resource bodies. Prior to this change, resource bodies were stored in
+					duplicate in two places in the database and this has now been corrected.
+					<br/><br/>
+					Note that a database migration script must be run for this upgrade, see
+					the changelog for details.
+				</li>
+				<li>
+					The validator has been refactored to use a single codebase across DSTU3/R4
+					validation which means that any fixes and enhancements will now affect both.
+					This makes the DSTU3 validator much more complete in terms of support for
+					advanced validation as well.
+				</li>
+				<li>
+					Several significant features were contributed by the community, including
+					native OSGi support (several HAPI FHIR JARs now have OSGi metadata included)
+					as well as initial experimental support for ElasticSearch instead of
+					Raw Lucene for the JPA server.
+				</li>
+				<li>
+					Several enhancements and bugfixes have been made to the interceptor
+					framework.
+				</li>
+				<li>
+					Many other bugfixes and enhancements have been made as well
+				</li>
+			</ul>
+			<p>
+				Note also that we are hiring! If you have an interest in helping us develop
+				HAPI FHIR or work on implementation projects, please
+				<a href="mailto:jamesagnew@gmail.com">get in touch</a>!
+			</p>
+			<p>
+				Thanks to everyone who contributed to this release! The HAPI FHIR community
+				continues to get bigger and bigger. Together we are transforming healthcare.
+			</p>
+			<p>
+				- <a href="https://github.com/jamesagnew/">James Agnew</a>
+			</p>
+			<br/><br/>
+-->
+			<!--
 			<p>
 				<b>Jan 13, 2018 - HAPI FHIR 3.2.0 Released</b> -
 				The next release of HAPI has now been uploaded to the Maven repos and
@@ -111,8 +555,8 @@
 			<p>
 				- <a href="https://github.com/jamesagnew/">James Agnew</a>
 			</p>
-			<br/><br/>
 
+			<br/><br/>
 			<p>
 				<b>November 23, 2017 - HAPI FHIR 3.1.0 Released</b> -
 				The next release of HAPI has now been uploaded to the Maven repos and
@@ -271,7 +715,6 @@
 			</p>
 			<br/><br/>
 
-			<!--
 			<p>
 				<b>June 8, 2017 - HAPI FHIR 2.5 Released</b> -
 				The next release of HAPI has now been uploaded to the Maven repos and

@@ -1,19 +1,19 @@
 package ca.uhn.fhir.jaxrs.client;
 
-import java.io.IOException;
+import java.io.*;
 
 /*
  * #%L
  * HAPI FHIR JAX-RS Server
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,10 +22,6 @@ import java.io.IOException;
  * #L%
  */
 
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.StringReader;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -34,26 +30,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.apache.commons.lang3.ObjectUtils;
+import ca.uhn.fhir.rest.client.impl.BaseHttpResponse;
+import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
+import ca.uhn.fhir.util.StopWatch;
 
 import ca.uhn.fhir.rest.client.api.IHttpResponse;
+import org.apache.commons.io.IOUtils;
 
 /**
  * A Http Response based on JaxRs. This is an adapter around the class {@link javax.ws.rs.core.Response Response}
  * @author Peter Van Houte | peter.vanhoute@agfa.com | Agfa Healthcare
  */
-public class JaxRsHttpResponse implements IHttpResponse {
+public class JaxRsHttpResponse extends BaseHttpResponse implements IHttpResponse {
 	
 	private boolean myBufferedEntity = false;
 	private final Response myResponse;
 	
-	public JaxRsHttpResponse(Response theResponse) {
+	public JaxRsHttpResponse(Response theResponse, StopWatch theResponseStopWatch) {
+		super(theResponseStopWatch);
 		this.myResponse = theResponse;
-	}
-
-	@Override
-	public void bufferEntitity() throws IOException {
-		bufferEntity();
 	}
 
 	@Override
@@ -117,7 +112,11 @@ public class JaxRsHttpResponse implements IHttpResponse {
 
 	@Override
 	public InputStream readEntity() {
-		return myResponse.readEntity(java.io.InputStream.class);
+		if (!myBufferedEntity && !myResponse.hasEntity()) {
+			return new ByteArrayInputStream(new byte[0]);
+		} else {
+			return new ByteArrayInputStream(myResponse.readEntity(byte[].class));
+		}
 	}
 
 	@Override

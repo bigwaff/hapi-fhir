@@ -1,10 +1,16 @@
 package ca.uhn.fhir.util;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.context.RuntimeResourceDefinition;
 import ca.uhn.fhir.model.primitive.IdDt;
+import ca.uhn.fhir.parser.DataFormatException;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import com.google.common.escape.Escaper;
 import com.google.common.net.PercentEscaper;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.hl7.fhir.instance.model.api.IPrimitiveType;
 
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
@@ -13,21 +19,20 @@ import java.net.URLDecoder;
 import java.util.*;
 import java.util.Map.Entry;
 
-import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.*;
 
 /*
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,6 +47,44 @@ public class UrlUtil {
 	private static final String URL_FORM_PARAMETER_OTHER_SAFE_CHARS = "-_.*";
 	private static final Escaper PARAMETER_ESCAPER = new PercentEscaper(URL_FORM_PARAMETER_OTHER_SAFE_CHARS, false);
 
+	public static class UrlParts {
+		private String myParams;
+		private String myResourceId;
+		private String myResourceType;
+		private String myVersionId;
+
+		public String getParams() {
+			return myParams;
+		}
+
+		public void setParams(String theParams) {
+			myParams = theParams;
+		}
+
+		public String getResourceId() {
+			return myResourceId;
+		}
+
+		public void setResourceId(String theResourceId) {
+			myResourceId = theResourceId;
+		}
+
+		public String getResourceType() {
+			return myResourceType;
+		}
+
+		public void setResourceType(String theResourceType) {
+			myResourceType = theResourceType;
+		}
+
+		public String getVersionId() {
+			return myVersionId;
+		}
+
+		public void setVersionId(String theVersionId) {
+			myVersionId = theVersionId;
+		}
+	}
 
 	/**
 	 * Resolve a relative URL - THIS METHOD WILL NOT FAIL but will log a warning and return theEndpoint if the input is invalid.
@@ -70,7 +113,7 @@ public class UrlUtil {
 			return theExtensionUrl;
 		}
 		if (theExtensionUrl == null) {
-			return theExtensionUrl;
+			return null;
 		}
 
 		int parentLastSlashIdx = theParentExtensionUrl.lastIndexOf('/');
@@ -113,10 +156,30 @@ public class UrlUtil {
 		return PARAMETER_ESCAPER.escape(theUnescaped);
 	}
 
-
 	public static boolean isAbsolute(String theValue) {
 		String value = theValue.toLowerCase();
 		return value.startsWith("http://") || value.startsWith("https://");
+	}
+
+	public static boolean isNeedsSanitization(CharSequence theString) {
+		if (theString != null) {
+			for (int i = 0; i < theString.length(); i++) {
+				char nextChar = theString.charAt(i);
+				switch (nextChar) {
+					case '\'':
+					case '"':
+					case '<':
+					case '>':
+					case '\n':
+					case '\r':
+						return true;
+				}
+				if (nextChar < ' ') {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	public static boolean isValid(String theUrl) {
@@ -159,18 +222,23 @@ public class UrlUtil {
 		return true;
 	}
 
-	public static void main(String[] args) {
-		System.out.println(escapeUrlParam("http://snomed.info/sct?fhir_vs=isa/126851005"));
+	public static RuntimeResourceDefinition parseUrlResourceType(FhirContext theCtx, String theUrl) throws DataFormatException {
+		int paramIndex = theUrl.indexOf('?');
+		String resourceName = theUrl.substring(0, paramIndex);
+		if (resourceName.contains("/")) {
+			resourceName = resourceName.substring(resourceName.lastIndexOf('/') + 1);
+		}
+		return theCtx.getResourceDefinition(resourceName);
 	}
 
 	public static Map<String, String[]> parseQueryString(String theQueryString) {
-		HashMap<String, List<String>> map = new HashMap<String, List<String>>();
+		HashMap<String, List<String>> map = new HashMap<>();
 		parseQueryString(theQueryString, map);
 		return toQueryStringMap(map);
 	}
 
 	private static void parseQueryString(String theQueryString, HashMap<String, List<String>> map) {
-		String query = theQueryString;
+		String query = defaultString(theQueryString);
 		if (query.startsWith("?")) {
 			query = query.substring(1);
 		}
@@ -197,17 +265,13 @@ public class UrlUtil {
 			nextKey = unescape(nextKey);
 			nextValue = unescape(nextValue);
 
-			List<String> list = map.get(nextKey);
-			if (list == null) {
-				list = new ArrayList<>();
-				map.put(nextKey, list);
-			}
+			List<String> list = map.computeIfAbsent(nextKey, k -> new ArrayList<>());
 			list.add(nextValue);
 		}
 	}
 
 	public static Map<String, String[]> parseQueryStrings(String... theQueryString) {
-		HashMap<String, List<String>> map = new HashMap<String, List<String>>();
+		HashMap<String, List<String>> map = new HashMap<>();
 		for (String next : theQueryString) {
 			parseQueryString(next, map);
 		}
@@ -222,7 +286,6 @@ public class UrlUtil {
 	 * <li>[Resource Type]/[Resource ID]/_history/[Version ID]
 	 * </ul>
 	 */
-	//@formatter:on
 	public static UrlParts parseUrl(String theUrl) {
 		String url = theUrl;
 		UrlParts retVal = new UrlParts();
@@ -243,13 +306,23 @@ public class UrlUtil {
 			retVal.setVersionId(id.getVersionIdPart());
 			return retVal;
 		}
-		if (url.matches("\\/[a-zA-Z]+\\?.*")) {
+
+		int parsingStart = 0;
+		if (url.length() > 2) {
+			if (url.charAt(0) == '/') {
+				if (Character.isLetter(url.charAt(1))) {
+					parsingStart = 1;
+				}
+			}
+		}
+
+		if (url.matches("/[a-zA-Z]+\\?.*")) {
 			url = url.substring(1);
 		}
 		int nextStart = 0;
 		boolean nextIsHistory = false;
 
-		for (int idx = 0; idx < url.length(); idx++) {
+		for (int idx = parsingStart; idx < url.length(); idx++) {
 			char nextChar = url.charAt(idx);
 			boolean atEnd = (idx + 1) == url.length();
 			if (nextChar == '?' || nextChar == '/' || atEnd) {
@@ -270,7 +343,7 @@ public class UrlUtil {
 				}
 				if (nextChar == '?') {
 					if (url.length() > idx + 1) {
-						retVal.setParams(url.substring(idx + 1, url.length()));
+						retVal.setParams(url.substring(idx + 1));
 					}
 					break;
 				}
@@ -282,12 +355,87 @@ public class UrlUtil {
 
 	}
 
-	//@formatter:off
+	/**
+	 * This method specifically HTML-encodes the &quot; and
+	 * &lt; characters in order to prevent injection attacks
+	 */
+	public static String sanitizeUrlPart(IPrimitiveType<?> theString) {
+		String retVal = null;
+		if (theString != null) {
+			retVal = sanitizeUrlPart(theString.getValueAsString());
+		}
+		return retVal;
+	}
+
+	/**
+	 * This method specifically HTML-encodes the &quot; and
+	 * &lt; characters in order to prevent injection attacks.
+	 *
+	 * The following characters are escaped:
+	 * <ul>
+	 *    <li>&apos;</li>
+	 *    <li>&quot;</li>
+	 *    <li>&lt;</li>
+	 *    <li>&gt;</li>
+	 *    <li>\n (newline)</li>
+	 * </ul>
+	 *
+	 */
+	public static String sanitizeUrlPart(CharSequence theString) {
+		if (theString == null) {
+			return null;
+		}
+
+		boolean needsSanitization = isNeedsSanitization(theString);
+
+		if (needsSanitization) {
+			// Ok, we're sanitizing
+			StringBuilder buffer = new StringBuilder(theString.length() + 10);
+			for (int j = 0; j < theString.length(); j++) {
+
+				char nextChar = theString.charAt(j);
+				switch (nextChar) {
+					/*
+					 * NB: If you add a constant here, you also need to add it
+					 * to isNeedsSanitization()!!
+					 */
+					case '\'':
+						buffer.append("&apos;");
+						break;
+					case '"':
+						buffer.append("&quot;");
+						break;
+					case '<':
+						buffer.append("&lt;");
+						break;
+					case '>':
+						buffer.append("&gt;");
+						break;
+					case '\n':
+						buffer.append("&#10;");
+						break;
+					case '\r':
+						buffer.append("&#13;");
+						break;
+					default:
+						if (nextChar >= ' ') {
+							buffer.append(nextChar);
+						}
+						break;
+				}
+
+			} // for build escaped string
+
+			return buffer.toString();
+		}
+
+		return theString.toString();
+	}
 
 	private static Map<String, String[]> toQueryStringMap(HashMap<String, List<String>> map) {
-		HashMap<String, String[]> retVal = new HashMap<String, String[]>();
+		HashMap<String, String[]> retVal = new HashMap<>();
 		for (Entry<String, List<String>> nextEntry : map.entrySet()) {
-			retVal.put(nextEntry.getKey(), nextEntry.getValue().toArray(new String[nextEntry.getValue().size()]));
+			retVal.put(nextEntry.getKey(), nextEntry.getValue().toArray(new String[0]));
 		}
 		return retVal;
 	}
@@ -300,6 +448,8 @@ public class UrlUtil {
 			char nextChar = theString.charAt(i);
 			if (nextChar == '%' || nextChar == '+') {
 				try {
+					// Yes it would be nice to not use a string "UTF-8" but the equivalent
+					// method that takes Charset is JDK10+ only... sigh....
 					return URLDecoder.decode(theString, "UTF-8");
 				} catch (UnsupportedEncodingException e) {
 					throw new Error("UTF-8 not supported, this shouldn't happen", e);
@@ -309,43 +459,23 @@ public class UrlUtil {
 		return theString;
 	}
 
-	public static class UrlParts {
-		private String myParams;
-		private String myResourceId;
-		private String myResourceType;
-		private String myVersionId;
-
-		public String getParams() {
-			return myParams;
+	public static List<NameValuePair> translateMatchUrl(String theMatchUrl) {
+		List<NameValuePair> parameters;
+		String matchUrl = theMatchUrl;
+		int questionMarkIndex = matchUrl.indexOf('?');
+		if (questionMarkIndex != -1) {
+			matchUrl = matchUrl.substring(questionMarkIndex + 1);
+		}
+		matchUrl = matchUrl.replace("|", "%7C");
+		matchUrl = matchUrl.replace("=>=", "=%3E%3D");
+		matchUrl = matchUrl.replace("=<=", "=%3C%3D");
+		matchUrl = matchUrl.replace("=>", "=%3E");
+		matchUrl = matchUrl.replace("=<", "=%3C");
+		if (matchUrl.contains(" ")) {
+			throw new InvalidRequestException("Failed to parse match URL[" + theMatchUrl + "] - URL is invalid (must not contain spaces)");
 		}
 
-		public void setParams(String theParams) {
-			myParams = theParams;
-		}
-
-		public String getResourceId() {
-			return myResourceId;
-		}
-
-		public void setResourceId(String theResourceId) {
-			myResourceId = theResourceId;
-		}
-
-		public String getResourceType() {
-			return myResourceType;
-		}
-
-		public void setResourceType(String theResourceType) {
-			myResourceType = theResourceType;
-		}
-
-		public String getVersionId() {
-			return myVersionId;
-		}
-
-		public void setVersionId(String theVersionId) {
-			myVersionId = theVersionId;
-		}
+		parameters = URLEncodedUtils.parse((matchUrl), Constants.CHARSET_UTF8, '&');
+		return parameters;
 	}
-
 }

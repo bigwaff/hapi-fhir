@@ -4,14 +4,14 @@ package ca.uhn.fhir.rest.server.method;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -69,20 +69,22 @@ public class SummaryEnumParameter implements IParameter {
 			retVal = null;
 		} else if (isBlank(summary[0])) {
 			retVal = null;
-		} else if (summary.length == 1) {
+		} else if (summary.length == 1 && summary[0].indexOf(',') == -1) {
 			retVal = toCollectionOrNull(SummaryEnum.fromCode(summary[0]));
 			if (retVal == null) {
 				retVal = toCollectionOrNull(SummaryEnum.fromCode(summary[0].toLowerCase()));
 			}
 		} else {
-			retVal = new HashSet<SummaryEnum>();
-			for (String next : summary) {
-				SummaryEnum value = SummaryEnum.fromCode(next);
-				if (value == null) {
-					value = SummaryEnum.fromCode(next.toLowerCase());
-				}
-				if (value != null) {
-					retVal.add(value);
+			retVal = new HashSet<>();
+			for (String nextParamValue : summary) {
+				for (String nextParamValueTok : nextParamValue.split(",")) {
+					SummaryEnum value = SummaryEnum.fromCode(nextParamValueTok);
+					if (value == null) {
+						value = SummaryEnum.fromCode(nextParamValueTok.toLowerCase());
+					}
+					if (value != null) {
+						retVal.add(value);
+					}
 				}
 			}
 		}

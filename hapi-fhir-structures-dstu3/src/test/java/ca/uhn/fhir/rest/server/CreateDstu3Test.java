@@ -36,10 +36,14 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.rest.annotation.*;
+import ca.uhn.fhir.rest.annotation.Create;
+import ca.uhn.fhir.rest.annotation.IdParam;
+import ca.uhn.fhir.rest.annotation.Read;
+import ca.uhn.fhir.rest.annotation.ResourceParam;
+import ca.uhn.fhir.rest.annotation.Search;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.client.MyPatientWithExtensions;
-import ca.uhn.fhir.util.PortUtil;
+import ca.uhn.fhir.test.utilities.JettyUtil;
 import ca.uhn.fhir.util.TestUtil;
 
 public class CreateDstu3Test {
@@ -74,17 +78,18 @@ public class CreateDstu3Test {
 		assertEquals(201, status.getStatusLine().getStatusCode());
 
 		assertEquals(1, status.getHeaders("Location").length);
-		assertEquals(0, status.getHeaders("Content-Location").length);
+		assertEquals(1, status.getHeaders("Content-Location").length);
 		assertEquals("http://localhost:" + ourPort + "/Patient/1", status.getFirstHeader("Location").getValue());
 
 	}
 
 	@Test
-	public void testCreateReturnsOperationOutcome() throws Exception {
+	public void testCreateReturnsRepresentation() throws Exception {
 		ourReturnOo = new OperationOutcome().addIssue(new OperationOutcomeIssueComponent().setDiagnostics("DIAG"));
+		String expectedResponseContent = "{\"resourceType\":\"Patient\",\"id\":\"1\",\"meta\":{\"versionId\":\"1\"},\"gender\":\"male\"}";
 		
 		HttpPost httpPost = new HttpPost("http://localhost:" + ourPort + "/Patient");
-		httpPost.setEntity(new StringEntity("{\"resourceType\":\"Patient\", \"status\":\"active\"}", ContentType.parse("application/fhir+json; charset=utf-8")));
+		httpPost.setEntity(new StringEntity("{\"resourceType\":\"Patient\", \"gender\":\"male\"}", ContentType.parse("application/fhir+json; charset=utf-8")));
 		HttpResponse status = ourClient.execute(httpPost);
 
 		String responseContent = IOUtils.toString(status.getEntity().getContent(), StandardCharsets.UTF_8);
@@ -93,8 +98,8 @@ public class CreateDstu3Test {
 		ourLog.info("Response was:\n{}", responseContent);
 
 		assertEquals(201, status.getStatusLine().getStatusCode());
+		assertEquals(expectedResponseContent, responseContent);
 
-		assertThat(responseContent, containsString("DIAG"));
 	}
 
 	/**
@@ -206,14 +211,13 @@ public class CreateDstu3Test {
 
 	@AfterClass
 	public static void afterClassClearContext() throws Exception {
-		ourServer.stop();
+		JettyUtil.closeServer(ourServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
 	@BeforeClass
 	public static void beforeClass() throws Exception {
-		ourPort = PortUtil.findFreePort();
-		ourServer = new Server(ourPort);
+		ourServer = new Server(0);
 
 		PatientProvider patientProvider = new PatientProvider();
 
@@ -224,7 +228,8 @@ public class CreateDstu3Test {
 		ServletHolder servletHolder = new ServletHolder(servlet);
 		proxyHandler.addServletWithMapping(servletHolder, "/*");
 		ourServer.setHandler(proxyHandler);
-		ourServer.start();
+		JettyUtil.startServer(ourServer);
+        ourPort = JettyUtil.getPortForStartedServer(ourServer);
 
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
 		HttpClientBuilder builder = HttpClientBuilder.create();
@@ -237,7 +242,10 @@ public class CreateDstu3Test {
 
 		@Create()
 		public MethodOutcome create(@ResourceParam Patient theIdParam) {
-			return new MethodOutcome(new IdType("Patient", "1"), true).setOperationOutcome(ourReturnOo);
+			theIdParam.setId("1");
+			theIdParam.getMeta().setVersionId("1");
+			
+			return new MethodOutcome(new IdType("Patient", "1"), true).setOperationOutcome(ourReturnOo).setResource(theIdParam);
 		}
 
 		@Override

@@ -4,14 +4,14 @@ package ca.uhn.fhir.rest.server;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,9 +21,7 @@ package ca.uhn.fhir.rest.server;
  */
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
 
 import org.hl7.fhir.instance.model.api.*;
 
@@ -35,7 +33,7 @@ public abstract class RestfulResponse<T extends RequestDetails> implements IRest
 
 	private IIdType myOperationResourceId;
 	private IPrimitiveType<Date> myOperationResourceLastUpdated;
-	private ConcurrentHashMap<String, String> theHeaders = new ConcurrentHashMap<String, String>();
+	private Map<String, List<String>> theHeaders = new HashMap<>();
 	private T theRequestDetails;
 
 	public RestfulResponse(T requestDetails) {
@@ -44,14 +42,15 @@ public abstract class RestfulResponse<T extends RequestDetails> implements IRest
 
 	@Override
 	public void addHeader(String headerKey, String headerValue) {
-		this.getHeaders().put(headerKey, headerValue);
+		this.getHeaders().computeIfAbsent(headerKey, k -> new ArrayList<>()).add(headerValue);
 	}
 
 	/**
 	 * Get the http headers
 	 * @return the headers
 	 */
-	public ConcurrentHashMap<String, String> getHeaders() {
+	@Override
+	public Map<String, List<String>> getHeaders() {
 		return theHeaders;
 	}
 

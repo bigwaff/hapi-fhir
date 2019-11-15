@@ -20,8 +20,8 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.hl7.fhir.instance.model.IdType;
-import org.hl7.fhir.instance.model.Patient;
+import org.hl7.fhir.dstu2.model.IdType;
+import org.hl7.fhir.dstu2.model.Patient;
 import org.junit.*;
 
 import ca.uhn.fhir.context.FhirContext;
@@ -30,7 +30,7 @@ import ca.uhn.fhir.model.primitive.StringDt;
 import ca.uhn.fhir.rest.annotation.*;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.MethodOutcome;
-import ca.uhn.fhir.util.PortUtil;
+import ca.uhn.fhir.test.utilities.JettyUtil;
 
 public class UpdateConditionalHl7OrgDstu2Test {
 	private static CloseableHttpClient ourClient;
@@ -70,7 +70,7 @@ public class UpdateConditionalHl7OrgDstu2Test {
 		ourLog.info("Response was:\n{}", responseContent);
 
 		assertEquals(200, status.getStatusLine().getStatusCode());
-		assertEquals("http://localhost:" + ourPort + "/Patient/001/_history/002", status.getFirstHeader("location").getValue());
+		assertEquals(null, status.getFirstHeader("location"));
 		assertEquals("http://localhost:" + ourPort + "/Patient/001/_history/002", status.getFirstHeader("content-location").getValue());
 		
 		assertNull(ourLastId);
@@ -97,7 +97,7 @@ public class UpdateConditionalHl7OrgDstu2Test {
 		ourLog.info("Response was:\n{}", responseContent);
 
 		assertEquals(200, status.getStatusLine().getStatusCode());
-		assertEquals("http://localhost:" + ourPort + "/Patient/001/_history/002", status.getFirstHeader("location").getValue());
+		assertEquals(null, status.getFirstHeader("location"));
 		assertEquals("http://localhost:" + ourPort + "/Patient/001/_history/002", status.getFirstHeader("content-location").getValue());
 		
 		assertEquals("Patient/2", new IdType(ourLastId).toUnqualified().getValue());
@@ -131,14 +131,13 @@ public class UpdateConditionalHl7OrgDstu2Test {
 	
 	@AfterClass
 	public static void afterClass() throws Exception {
-		ourServer.stop();
+		JettyUtil.closeServer(ourServer);
 	}
 		
 	
 	@BeforeClass
 	public static void beforeClass() throws Exception {
-		ourPort = PortUtil.findFreePort();
-		ourServer = new Server(ourPort);
+		ourServer = new Server(0);
 
 		PatientProvider patientProvider = new PatientProvider();
 
@@ -148,7 +147,8 @@ public class UpdateConditionalHl7OrgDstu2Test {
 		ServletHolder servletHolder = new ServletHolder(servlet);
 		proxyHandler.addServletWithMapping(servletHolder, "/*");
 		ourServer.setHandler(proxyHandler);
-		ourServer.start();
+		JettyUtil.startServer(ourServer);
+        ourPort = JettyUtil.getPortForStartedServer(ourServer);
 
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
 		HttpClientBuilder builder = HttpClientBuilder.create();

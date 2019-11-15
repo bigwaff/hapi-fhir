@@ -32,136 +32,248 @@
 				<thead>
 					<tr>
 						<td><b>HAPI Version</b></td>
+						<td><b>Min JDK</b></td>
 						<td><b>DSTU1</b></td>
 						<td><b>DSTU2</b></td>
 						<td><b>DSTU2.1</b></td>
 						<td><b>DSTU3</b></td>
 						<td><b>R4</b></td>
+						<td><b>R5</b></td>
 					</tr>
 				</thead>
 				<tbody>
 					<tr>
 						<td>HAPI FHIR 1.1</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
-						<td style="background: #EEB;">Draft 0.5.0-5843</td>
+						<td style="background: #EEB;">0.5.0-5843</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 1.2</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
-						<td style="background: #EEB;">Draft 0.5.0-5843</td>
+						<td style="background: #EEB;">0.5.0-5843</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 1.3</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 1.4</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
 						<td style="background: #DDD;"></td>
-						<td style="background: #EEB;">Draft 1.3.0-7602</td>
+						<td style="background: #EEB;">1.3.0-7602</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 1.5</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
 						<td style="background: #DDD;"></td>
-						<td style="background: #EEB;">Draft 1.4.0-8138</td>
+						<td style="background: #EEB;">1.4.0-8138</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 1.6</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
 						<td style="background: #DDD;"></td>
-						<td style="background: #EEB;">Draft 1.4.0-8636</td>
+						<td style="background: #EEB;">1.4.0-8636</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 2.0</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
 						<td style="background: #DDD;"></td>
-						<td style="background: #EEB;">Draft 1.6.0-9663</td>
+						<td style="background: #EEB;">1.6.0-9663</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 2.1</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
 						<td style="background: #DDD;"></td>
-						<td style="background: #EEB;">Draft 1.7.0-10129</td>
+						<td style="background: #EEB;">1.7.0-10129</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 2.2</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
-						<td style="background: #EEB;">Draft 1.4.0</td>
-						<td style="background: #EEB;">Draft 1.8.0-10528</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #EEB;">1.8.0-10528</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 2.3</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
-						<td style="background: #EEB;">Draft 1.4.0</td>
-						<td style="background: #EEB;">Draft 1.9.0-11501</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #EEB;">1.9.0-11501</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 2.4</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
-						<td style="background: #EEB;">Draft 1.4.0</td>
+						<td style="background: #EEB;">1.4.0</td>
 						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 2.5</td>
+						<td>JDK6</td>
 						<td style="background: #CEC;">0.0.82</td>
 						<td style="background: #CEC;">1.0.2</td>
-						<td style="background: #EEB;">Draft 1.4.0</td>
+						<td style="background: #EEB;">1.4.0</td>
 						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #DDD;"></td>
 						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 3.0.0</td>
+						<td>JDK7</td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #CEC;">1.0.2</td>
-						<td style="background: #EEB;">Draft 1.4.0</td>
+						<td style="background: #EEB;">1.4.0</td>
 						<td style="background: #CEC;">3.0.1</td>
-						<td style="background: #EEB;">Draft 3.1.0-12370</td>
+						<td style="background: #EEB;">3.1.0-12370</td>
+						<td style="background: #DDD;"></td>
 						</tr>
 					<tr>
 						<td>HAPI FHIR 3.1.0</td>
+						<td>JDK7</td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #CEC;">1.0.2</td>
-						<td style="background: #EEB;">Draft 1.4.0</td>
+						<td style="background: #EEB;">1.4.0</td>
 						<td style="background: #CEC;">3.0.1</td>
-						<td style="background: #EEB;">Draft 3.1.0-12370</td>
+						<td style="background: #EEB;">3.1.0-12370</td>
+						<td style="background: #DDD;"></td>
 					</tr>
 					<tr>
 						<td>HAPI FHIR 3.2.0</td>
+						<td>JDK7</td>
 						<td style="background: #DDD;"></td>
 						<td style="background: #CEC;">1.0.2</td>
-						<td style="background: #EEB;">Draft 1.4.0</td>
+						<td style="background: #EEB;">1.4.0</td>
 						<td style="background: #CEC;">3.0.1</td>
-						<td style="background: #EEB;">Draft 3.2.0-12917</td>
+						<td style="background: #EEB;">3.2.0-12917</td>
+						<td style="background: #DDD;"></td>
+					</tr>
+					<tr>
+						<td>HAPI FHIR 3.3.0</td>
+						<td>JDK7</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #EEB;">3.2.0-13271</td>
+						<td style="background: #DDD;"></td>
+					</tr>
+					<tr>
+						<td>HAPI FHIR 3.4.0</td>
+						<td>JDK8</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #EEB;">3.4.0-13732</td>
+						<td style="background: #DDD;"></td>
+					</tr>
+						<tr>
+						<td>HAPI FHIR 3.5.0</td>
+						<td>JDK8</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #EEB;">3.4.0-13732</td>
+						<td style="background: #DDD;"></td>
+					</tr>
+					<tr>
+						<td>HAPI FHIR 3.6.0</td>
+						<td>JDK8</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #EEB;">3.6.0-1202b2eed0f</td>
+						<td style="background: #DDD;"></td>
+					</tr>
+					<tr>
+						<td>HAPI FHIR 3.7.0</td>
+						<td>JDK8</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #CEC;">4.0.0</td>
+						<td style="background: #DDD;"></td>
+					</tr>
+					<tr>
+						<td>HAPI FHIR 3.8.0</td>
+						<td>JDK8</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #CEC;">4.0.0</td>
+						<td style="background: #DDD;"></td>
+					</tr>
+					<tr>
+						<td>HAPI FHIR 4.0.0</td>
+						<td>JDK8</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.1</td>
+						<td style="background: #CEC;">4.0.0</td>
+						<td style="background: #EEB;">4.1.0-e0e3caf9ba</td>
+					</tr>
+					<tr>
+						<td>HAPI FHIR 4.1.0</td>
+						<td>JDK8</td>
+						<td style="background: #DDD;"></td>
+						<td style="background: #CEC;">1.0.2</td>
+						<td style="background: #EEB;">1.4.0</td>
+						<td style="background: #CEC;">3.0.2</td>
+						<td style="background: #CEC;">4.0.1</td>
+						<td style="background: #EEB;">4.1.0-1a7623d866</td>
 					</tr>
 
-				</tbody>
+		</tbody>
 			</table>
 
 		</section>
@@ -249,7 +361,7 @@
 					</tr>
 					<tr><td style="text-align: center; font-size: 1.2em; background: #DDE; padding: 3px;" colspan="2">Validation</td></tr>
 					<tr>
-						<td style="font-weight: bold; white-space: nowrap;">hapi-fhir-validator</td>
+						<td style="font-weight: bold; white-space: nowrap;">hapi-fhir-validation</td>
 						<td>
 							This module contains the FHIR Profile Validator, which is used to 
 							validate resource instances against FHIR Profiles (StructureDefinitions,
@@ -351,7 +463,7 @@
 				version of FHIR.
 			</p>
 
-			<subsection name="DSTU2 Resources - HAPI Structures">
+			<subsection name="HAPI Structures (Response Models)">
 
 				<p>
 					HAPI also has a <code>hapi-fhir-structures-dstu2-[version].jar</code>, which
@@ -508,13 +620,14 @@ System.setProperty("javax.xml.stream.XMLEventFactory", "com.ctc.wstx.stax.WstxEv
 
 			</subsection>
 
-			<subsection name="Phloc-Schematron">
+			<subsection name="Ph-Schematron">
 
 				<p>
 					If you are using the
 					<a href="./doc_validation.html">Schematron Validatioon</a>
-					module, you will also need to include the Phloc library on your
-					classpath.
+					module, you will also need to include the Ph-Schematron library on your
+					classpath. (Note that prior to HAPI FHIR 3.4.0 we used Phloc-Schamtron
+					instead, but that lirary has been discontinued)
 				</p>
 				<p>
 					If you are using Maven, this library is not added by default (it is
@@ -523,16 +636,15 @@ System.setProperty("javax.xml.stream.XMLEventFactory", "com.ctc.wstx.stax.WstxEv
 					dependencies to your project POM.xml
 				</p>
 				<source><![CDATA[<dependency>
-    <groupId>com.phloc</groupId>
-    <artifactId>phloc-schematron</artifactId>
-    <version>${phloc_schematron_version}</version>
+	<groupId>com.helger</groupId>
+	<artifactId>ph-schematron</artifactId>
+	<version>${ph_schematron_version}</version>
 </dependency>
 <dependency>
-    <groupId>com.phloc</groupId>
-    <artifactId>phloc-commons</artifactId>
-    <version>${phloc_commons_version}</version>
+	<groupId>com.helger</groupId>
+	<artifactId>ph-commons</artifactId>
+	<version>${ph_commons_version}</version>
 </dependency>]]></source>
-
 			</subsection>
 
 

@@ -1,23 +1,25 @@
 package org.hl7.fhir.instance.hapi.validation;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.api.Constants;
 import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.instance.formats.IParser;
-import org.hl7.fhir.instance.formats.ParserType;
+import org.hl7.fhir.dstu2.formats.IParser;
+import org.hl7.fhir.dstu2.formats.ParserType;
 import org.hl7.fhir.instance.hapi.validation.IValidationSupport.CodeValidationResult;
-import org.hl7.fhir.instance.model.*;
-import org.hl7.fhir.instance.model.ValueSet.ConceptDefinitionComponent;
-import org.hl7.fhir.instance.model.ValueSet.ConceptReferenceComponent;
-import org.hl7.fhir.instance.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.instance.model.ValueSet.ValueSetExpansionComponent;
-import org.hl7.fhir.instance.terminologies.ValueSetExpander;
-import org.hl7.fhir.instance.terminologies.ValueSetExpanderFactory;
-import org.hl7.fhir.instance.terminologies.ValueSetExpanderSimple;
-import org.hl7.fhir.instance.utils.INarrativeGenerator;
-import org.hl7.fhir.instance.utils.IResourceValidator;
-import org.hl7.fhir.instance.utils.IWorkerContext;
+import org.hl7.fhir.dstu2.model.*;
+import org.hl7.fhir.dstu2.model.ValueSet.ConceptDefinitionComponent;
+import org.hl7.fhir.dstu2.model.ValueSet.ConceptReferenceComponent;
+import org.hl7.fhir.dstu2.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.dstu2.model.ValueSet.ValueSetExpansionComponent;
+import org.hl7.fhir.dstu2.terminologies.ValueSetExpander;
+import org.hl7.fhir.dstu2.terminologies.ValueSetExpanderFactory;
+import org.hl7.fhir.dstu2.terminologies.ValueSetExpanderSimple;
+import org.hl7.fhir.dstu2.utils.INarrativeGenerator;
+import org.hl7.fhir.dstu2.utils.IResourceValidator;
+import org.hl7.fhir.dstu2.utils.IWorkerContext;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 
+import java.io.IOException;
 import java.util.List;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -33,11 +35,16 @@ public final class HapiWorkerContext implements IWorkerContext, ValueSetExpander
 
 	@Override
 	public List<StructureDefinition> allStructures() {
-		throw new UnsupportedOperationException();
+		return myValidationSupport.allStructures();
 	}
 
 	@Override
-	public ValueSetExpansionOutcome expand(ValueSet theSource) throws ETooCostly, Exception {
+	public StructureDefinition fetchTypeDefinition(String theUri) {
+		return fetchResource(StructureDefinition.class, theUri);
+	}
+
+	@Override
+	public ValueSetExpansionOutcome expand(ValueSet theSource) throws IOException, ETooCostly {
 		ValueSetExpander vse = new ValueSetExpanderSimple(this, this);
 		ValueSetExpansionOutcome vso = vse.expand(theSource);
 		if (vso.getError() != null) {
@@ -143,7 +150,7 @@ public final class HapiWorkerContext implements IWorkerContext, ValueSetExpander
 	public ValidationResult validateCode(CodeableConcept theCode, ValueSet theVs) {
 		for (Coding next : theCode.getCoding()) {
 			ValidationResult retVal = validateCode(next, theVs);
-			if (retVal != null && retVal.isOk()) {
+			if (retVal.isOk()) {
 				return retVal;
 			}
 		}
@@ -176,7 +183,7 @@ public final class HapiWorkerContext implements IWorkerContext, ValueSetExpander
 	@Override
 	public ValidationResult validateCode(String theSystem, String theCode, String theDisplay, ValueSet theVs) {
 
-		if (theSystem == null || StringUtils.equals(theSystem, theVs.getCodeSystem().getSystem())) {
+		if (Constants.codeSystemNotNeeded(theSystem) || StringUtils.equals(theSystem, theVs.getCodeSystem().getSystem())) {
 			for (ConceptDefinitionComponent next : theVs.getCodeSystem().getConcept()) {
 				ValidationResult retVal = validateCodeSystem(theCode, next);
 				if (retVal != null && retVal.isOk()) {
@@ -212,7 +219,7 @@ public final class HapiWorkerContext implements IWorkerContext, ValueSetExpander
 			}
 		}
 
-		return new ValidationResult(IssueSeverity.ERROR, "Unknown code[" + theCode + "] in system[" + theSystem + "]");
+		return new ValidationResult(IssueSeverity.ERROR, "Unknown code[" + theCode + "] in system[" + Constants.codeSystemWithDefaultDescription(theSystem) + "]");
 	}
 
 	private ValidationResult validateCodeSystem(String theCode, ConceptDefinitionComponent theConcept) {

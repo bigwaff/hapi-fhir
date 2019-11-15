@@ -1,9 +1,18 @@
 package ca.uhn.fhir.jpa.test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.jpa.subscription.module.subscriber.IResourceRetriever;
+import ca.uhn.fhir.rest.server.FifoMemoryPagingProvider;
+import ca.uhn.fhir.rest.server.RestfulServer;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -18,25 +27,34 @@ import ca.uhn.fhir.rest.param.DateRangeParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
 import ca.uhn.fhir.rest.server.IResourceProvider;
 
+import javax.annotation.Nonnull;
+
 public class OverlayTestApp {
 
 	private static AnnotationConfigApplicationContext ourAppCtx;
 
 	@SuppressWarnings({ "unchecked" })
 	public static void main(String[] args) throws Exception {
+
 		{
 			int myPort = 8888;
 			Server server = new Server(myPort);
 
-			WebAppContext root = new WebAppContext();
+			WebAppContext overlayHandler = new WebAppContext();
+			overlayHandler.setContextPath("/testpage/base");
+			overlayHandler.setDescriptor("hapi-fhir-testpage-overlay/src/test/resources/web.xml");
+			overlayHandler.setResourceBase("hapi-fhir-testpage-overlay/src/main/webapp");
+			overlayHandler.setParentLoaderPriority(true);
 
-			root.setContextPath("/");
-			root.setDescriptor("src/test/resources/web.xml");
-			root.setResourceBase("src/main/webapp");
+			RestfulServer restfulServer = new RestfulServer(FhirContext.forDstu2());
+			restfulServer.registerProvider(new ProviderWithRequiredAndOptional());
+			ServletContextHandler proxyHandler = new ServletContextHandler();
+			proxyHandler.setContextPath("/");
+			ServletHolder servletHolder = new ServletHolder();
+			servletHolder.setServlet(restfulServer);
+			proxyHandler.addServlet(servletHolder, "/fhir/*");
 
-			root.setParentLoaderPriority(true);
-
-			server.setHandler(root);
+			server.setHandler(new HandlerCollection(overlayHandler, proxyHandler));
 
 			server.start();
 
@@ -56,7 +74,7 @@ public class OverlayTestApp {
 //		restServerDstu2.setPagingProvider(new FifoMemoryPagingProvider(10));
 //		restServerDstu2.setImplementationDescription("This is a great server!!!!");
 //		restServerDstu2.setFhirContext(ourAppCtx.getBean("myFhirContextDstu2", FhirContext.class));
-//		List<IResourceProvider> rpsDev = (List<IResourceProvider>) ourAppCtx.getBean("myResourceProvidersDstu2", List.class);
+//		List<IResourceRetriever> rpsDev = (List<IResourceRetriever>) ourAppCtx.getBean("myResourceProvidersDstu2", List.class);
 //		restServerDstu2.setResourceProviders(rpsDev);
 //
 //		JpaSystemProviderDstu2 systemProvDev = (JpaSystemProviderDstu2) ourAppCtx.getBean("mySystemProviderDstu2", JpaSystemProviderDstu2.class);
@@ -74,7 +92,7 @@ public class OverlayTestApp {
 //		restServerDstu1.setPagingProvider(new FifoMemoryPagingProvider(10));
 //		restServerDstu1.setImplementationDescription("This is a great server!!!!");
 //		restServerDstu1.setFhirContext(ourAppCtx.getBean("myFhirContextDstu1", FhirContext.class));
-//		List<IResourceProvider> rpsDstu1 = (List<IResourceProvider>) ourAppCtx.getBean("myResourceProvidersDstu1", List.class);
+//		List<IResourceRetriever> rpsDstu1 = (List<IResourceRetriever>) ourAppCtx.getBean("myResourceProvidersDstu1", List.class);
 //		restServerDstu1.setResourceProviders(rpsDstu1);
 //
 //		JpaSystemProviderDstu1 systemProvDstu1 = (JpaSystemProviderDstu1) ourAppCtx.getBean("mySystemProviderDstu1", JpaSystemProviderDstu1.class);
@@ -141,14 +159,37 @@ public class OverlayTestApp {
 		@Search
 		public List<DiagnosticReport> findDiagnosticReportsByPatient(@RequiredParam(name = DiagnosticReport.SP_SUBJECT + '.' + Patient.SP_IDENTIFIER) IdentifierDt thePatientId, @OptionalParam(name = DiagnosticReport.SP_CODE) TokenOrListParam theNames,
 				@OptionalParam(name = DiagnosticReport.SP_DATE) DateRangeParam theDateRange, @IncludeParam(allow = { "DiagnosticReport.result" }) Set<Include> theIncludes) throws Exception {
-			return null;
+			return getDiagnosticReports();
 		}
 
 		@Description(shortDefinition = "This is a query by issued.. blah blah foo bar blah blah")
 		@Search
 		public List<DiagnosticReport> findDiagnosticReportsByPatientIssued(@RequiredParam(name = DiagnosticReport.SP_SUBJECT + '.' + Patient.SP_IDENTIFIER) IdentifierDt thePatientId, @OptionalParam(name = DiagnosticReport.SP_CODE) TokenOrListParam theNames,
 				@OptionalParam(name = DiagnosticReport.SP_ISSUED) DateRangeParam theDateRange, @IncludeParam(allow = { "DiagnosticReport.result" }) Set<Include> theIncludes) throws Exception {
-			return null;
+			return getDiagnosticReports();
+		}
+
+		@Description(shortDefinition = "This is a query by issued.. blah blah foo bar blah blah")
+		@Search
+		public List<DiagnosticReport> findDiagnosticReportsByPatientIssued() throws Exception {
+			return getDiagnosticReports();
+		}
+
+		@Nonnull
+		private List<DiagnosticReport> getDiagnosticReports() {
+			ArrayList<DiagnosticReport> retVal = new ArrayList<>();
+
+			DiagnosticReport dr = new DiagnosticReport();
+			dr.addResult().setReference("Observation/123");
+			dr.setId("DiagnosticReport/1");
+			retVal.add(dr);
+
+			dr = new DiagnosticReport();
+			dr.addResult().setReference("Observation/123");
+			dr.setId("DiagnosticReport/2");
+			retVal.add(dr);
+
+			return retVal;
 		}
 
 		@Override

@@ -1,17 +1,25 @@
 package org.hl7.fhir.instance.hapi.validation;
 
-import org.hl7.fhir.instance.model.ValueSet;
-import org.hl7.fhir.instance.model.ValueSet.ConceptDefinitionComponent;
-import org.hl7.fhir.instance.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.instance.model.ValueSet.ValueSetExpansionComponent;
+import org.hl7.fhir.dstu2.model.StructureDefinition;
+import org.hl7.fhir.dstu2.model.ValueSet;
+import org.hl7.fhir.dstu2.model.ValueSet.ConceptDefinitionComponent;
+import org.hl7.fhir.dstu2.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.dstu2.model.ValueSet.ValueSetExpansionComponent;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 
 import ca.uhn.fhir.context.FhirContext;
 
+import java.util.List;
+
 public interface IValidationSupport {
 
-  /**
+	/**
+	 * Fetch all structuredefinitions
+	 */
+	List<StructureDefinition> allStructures();
+
+	/**
    * Expands the given portion of a ValueSet
    * 
    * @param theInclude

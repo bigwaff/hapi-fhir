@@ -4,14 +4,14 @@ package ca.uhn.fhir.rest.client.method;
  * #%L
  * HAPI FHIR - Client Framework
  * %%
- * Copyright (C) 2014 - 2018 University Health Network
+ * Copyright (C) 2014 - 2019 University Health Network
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,6 +26,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Date;
 
+import ca.uhn.fhir.rest.param.DateParam;
+import ca.uhn.fhir.rest.param.DateRangeParam;
 import org.hl7.fhir.instance.model.api.*;
 
 import ca.uhn.fhir.context.FhirContext;
@@ -96,7 +98,7 @@ public class HistoryMethodBinding extends BaseResourceReturningMethodBinding {
 		}
 
 		String historyId = id != null ? id.getIdPart() : null;
-		HttpGetClientInvocation retVal = createHistoryInvocation(getContext(), resourceName, historyId, null, null);
+		HttpGetClientInvocation retVal = createHistoryInvocation(getContext(), resourceName, historyId, null, null, null);
 
 		if (theArgs != null) {
 			for (int idx = 0; idx < theArgs.length; idx++) {
@@ -108,7 +110,7 @@ public class HistoryMethodBinding extends BaseResourceReturningMethodBinding {
 		return retVal;
 	}
 
-	public static HttpGetClientInvocation createHistoryInvocation(FhirContext theContext, String theResourceName, String theId, IPrimitiveType<Date> theSince, Integer theLimit) {
+	public static HttpGetClientInvocation createHistoryInvocation(FhirContext theContext, String theResourceName, String theId, IPrimitiveType<Date> theSince, Integer theLimit, DateRangeParam theAt) {
 		StringBuilder b = new StringBuilder();
 		if (theResourceName != null) {
 			b.append(theResourceName);
@@ -129,7 +131,17 @@ public class HistoryMethodBinding extends BaseResourceReturningMethodBinding {
 		}
 		if (theLimit != null) {
 			b.append(haveParam ? '&' : '?');
+			haveParam = true;
 			b.append(Constants.PARAM_COUNT).append('=').append(theLimit);
+		}
+		if (theAt != null) {
+			for (DateParam next : theAt.getValuesAsQueryTokens()) {
+				b.append(haveParam ? '&' : '?');
+				haveParam = true;
+				b.append(Constants.PARAM_AT);
+				b.append("=");
+				b.append(next.getValueAsQueryToken(theContext));
+			}
 		}
 
 		HttpGetClientInvocation retVal = new HttpGetClientInvocation(theContext, b.toString());

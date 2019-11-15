@@ -1,42 +1,50 @@
 package ca.uhn.fhir.jaxrs.server;
 
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
-
-import java.util.*;
-
-import org.apache.commons.lang3.StringUtils;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.hamcrest.BaseMatcher;
-import org.hamcrest.Description;
-import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
-import org.junit.*;
-import org.junit.Test;
-import org.junit.runners.MethodSorters;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Matchers;
-
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.jaxrs.client.JaxRsRestfulClientFactory;
-import ca.uhn.fhir.jaxrs.server.interceptor.JaxRsExceptionInterceptor;
 import ca.uhn.fhir.jaxrs.server.interceptor.JaxRsResponseException;
-import ca.uhn.fhir.jaxrs.server.test.*;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsConformanceRestProvider;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsMockPageProvider;
+import ca.uhn.fhir.jaxrs.server.test.TestJaxRsMockPatientRestProvider;
 import ca.uhn.fhir.model.api.IResource;
 import ca.uhn.fhir.model.dstu2.composite.IdentifierDt;
 import ca.uhn.fhir.model.dstu2.resource.*;
-import ca.uhn.fhir.model.dstu2.resource.Bundle.Entry;
-import ca.uhn.fhir.model.primitive.*;
+import ca.uhn.fhir.model.primitive.DateDt;
+import ca.uhn.fhir.model.primitive.IdDt;
+import ca.uhn.fhir.model.primitive.StringDt;
+import ca.uhn.fhir.model.primitive.UriDt;
 import ca.uhn.fhir.rest.api.*;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
 import ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor;
 import ca.uhn.fhir.rest.param.StringAndListParam;
 import ca.uhn.fhir.rest.param.StringParam;
+import ca.uhn.fhir.rest.server.SimpleBundleProvider;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import ca.uhn.fhir.util.TestUtil;
+import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
+import org.junit.*;
+import org.junit.runners.MethodSorters;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Matchers;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.*;
+
+import ca.uhn.fhir.test.utilities.JettyUtil;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class AbstractJaxRsResourceProviderTest {
@@ -63,13 +71,20 @@ public class AbstractJaxRsResourceProviderTest {
 	}
 
 	@AfterClass
-	public static void afterClassClearContext() {
+	public static void afterClassClearContext() throws Exception {
+        JettyUtil.closeServer(jettyServer);
 		TestUtil.clearAllStaticFieldsForUnitTest();
 	}
 
 	private Patient createPatient(long id) {
 		Patient theResource = new Patient();
 		theResource.setId(new IdDt(id));
+		return theResource;
+	}
+
+	private Patient createPatient(long id, String version) {
+		Patient theResource = new Patient();
+		theResource.setId(new IdDt(id).withVersion(version));
 		return theResource;
 	}
 
@@ -127,7 +142,7 @@ public class AbstractJaxRsResourceProviderTest {
 	@Test
 	public void testConformance() {
 		final Conformance conf = client.fetchConformance().ofType(Conformance.class).execute();
-		assertEquals(conf.getRest().get(0).getResource().get(0).getType().toString(), "Patient");
+		assertEquals(conf.getRest().get(0).getResource().get(0).getType(), "Patient");
 	}
 
 	@Test
@@ -154,7 +169,7 @@ public class AbstractJaxRsResourceProviderTest {
 	}
 
 	@Test
-	public void testConditionalDelete() throws Exception {
+	public void testConditionalDelete() {
 		when(mock.delete(idCaptor.capture(), conditionalCaptor.capture())).thenReturn(new MethodOutcome());
 		client.delete().resourceConditionalByType("Patient").where(Patient.IDENTIFIER.exactly().identifier("2")).execute();
 		assertEquals("Patient?identifier=2&_format=json", conditionalCaptor.getValue());
@@ -198,11 +213,6 @@ public class AbstractJaxRsResourceProviderTest {
 		assertEquals("outputValue", ((StringDt) outParams.getParameter().get(0).getValue()).getValueAsString());
 	}
 
-	/** Search using other query options */
-	public void testOther() {
-		// missing
-	}
-
 	@Test
 	public void testRead() {
 		when(mock.find(idCaptor.capture())).thenReturn(createPatient(1));
@@ -226,9 +236,12 @@ public class AbstractJaxRsResourceProviderTest {
 	/** */
 	@Test
 	public void testSearchPost() {
-		when(mock.search(any(StringParam.class), Matchers.isNull(StringAndListParam.class)))
+		when(mock.search(isNull(), isNull()))
 				.thenReturn(createPatients(1, 13));
-		Bundle result = client.search().forResource("Patient").usingStyle(SearchStyleEnum.POST)
+		Bundle result = client
+			.search()
+			.forResource("Patient")
+			.usingStyle(SearchStyleEnum.POST)
 				.returnBundle(Bundle.class).execute();
 		IResource resource = result.getEntry().get(0).getResource();
 		compareResultId(1, resource);
@@ -253,12 +266,12 @@ public class AbstractJaxRsResourceProviderTest {
 	/** Search - Multi-valued Parameters (ANY/OR) */
 	@Test
 	public void testSearchUsingGenericClientBySearchWithMultiValues() {
-		when(mock.search(any(StringParam.class), Matchers.isNotNull(StringAndListParam.class)))
+		when(mock.search(any(StringParam.class), any(StringAndListParam.class)))
 				.thenReturn(Arrays.asList(createPatient(1)));
 		Bundle results = client.search().forResource(Patient.class)
 				.where(Patient.ADDRESS.matches().values("Toronto")).and(Patient.ADDRESS.matches().values("Ontario"))
 				.and(Patient.ADDRESS.matches().values("Canada"))
-				.where(Patient.IDENTIFIER.exactly().systemAndIdentifier("SHORTNAME", "TOYS")).returnBundle(Bundle.class).execute();
+				.where(Patient.NAME.matches().value("SHORTNAME")).returnBundle(Bundle.class).execute();
 		IResource resource = results.getEntry().get(0).getResource();
 
 		compareResultId(1, resource);
@@ -269,7 +282,7 @@ public class AbstractJaxRsResourceProviderTest {
 	@Test
 	public void testSearchWithPaging() {
 		// Perform a search
-		when(mock.search(any(StringParam.class), Matchers.isNull(StringAndListParam.class)))
+		when(mock.search(isNull(), isNull()))
 				.thenReturn(createPatients(1, 13));
 		final Bundle results = client.search().forResource(Patient.class).limitTo(8).returnBundle(Bundle.class)
 				.execute();
@@ -333,12 +346,32 @@ public class AbstractJaxRsResourceProviderTest {
 
 	@Test
 	public void testVRead() {
-		when(mock.findHistory(idCaptor.capture())).thenReturn(createPatient(1));
+		when(mock.findVersion(idCaptor.capture())).thenReturn(createPatient(1));
 		final Patient patient = client.vread(Patient.class, "1", "2");
 		compareResultId(1, patient);
 		compareResultUrl("/Patient/1", patient);
 		assertEquals("1", idCaptor.getValue().getIdPart());
 		assertEquals("2", idCaptor.getValue().getVersionIdPart());
+	}
+
+	@Test
+	public void testInstanceHistory() {
+		when(mock.getHistoryForInstance(idCaptor.capture())).thenReturn(new SimpleBundleProvider(Collections.singletonList(createPatient(1, "1"))));
+		final Bundle bundle = client.history().onInstance(new IdDt("Patient", 1L)).returnBundle(Bundle.class).execute();
+		Patient patient = (Patient) bundle.getEntryFirstRep().getResource();
+		compareResultId(1, patient);
+		compareResultUrl("/Patient/1/_history/1", patient);
+		assertEquals("1", idCaptor.getValue().getIdPart());
+		assertNull(idCaptor.getValue().getVersionIdPart());
+	}
+
+	@Test
+	public void testTypeHistory() {
+		when(mock.getHistoryForType()).thenReturn(new SimpleBundleProvider(Collections.singletonList(createPatient(1, "1"))));
+		final Bundle bundle = client.history().onType(Patient.class).returnBundle(Bundle.class).execute();
+		Patient patient = (Patient) bundle.getEntryFirstRep().getResource();
+		compareResultId(1, patient);
+		compareResultUrl("/Patient/1/_history/1", patient);
 	}
 
 	@Test
@@ -370,49 +403,40 @@ public class AbstractJaxRsResourceProviderTest {
 	}
 
 	private <T> T withId(final T id) {
-		return argThat(new BaseMatcher<T>() {
-			@Override
-			public void describeTo(Description arg0) {
+		return argThat(other -> {
+			IdDt thisId;
+			IdDt otherId;
+			if (id instanceof IdDt) {
+				thisId = (IdDt) id;
+				otherId = (IdDt) other;
+			} else {
+				thisId = ((IResource) id).getId();
+				otherId = ((IResource) other).getId();
 			}
-
-			@Override
-			public boolean matches(Object other) {
-				IdDt thisId;
-				IdDt otherId;
-				if (id instanceof IdDt) {
-					thisId = (IdDt) id;
-					otherId = (IdDt) other;
-				} else {
-					thisId = ((IResource) id).getId();
-					otherId = ((IResource) other).getId();
-				}
-				return thisId.getIdPartAsLong().equals(otherId.getIdPartAsLong());
-			}
+			return thisId.getIdPartAsLong().equals(otherId.getIdPartAsLong());
 		});
 	}
 
 	@BeforeClass
 	public static void setUpClass() throws Exception {
-		ourPort = RandomServerPortProvider.findFreePort();
 		ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
 		context.setContextPath("/");
-		System.out.println(ourPort);
-		jettyServer = new Server(ourPort);
+		jettyServer = new Server(0);
 		jettyServer.setHandler(context);
-		ServletHolder jerseyServlet = context.addServlet(org.glassfish.jersey.servlet.ServletContainer.class, "/*");
+		ServletHolder jerseyServlet = context.addServlet(org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher.class, "/*");
 		jerseyServlet.setInitOrder(0);
 
 		//@formatter:off
-		jerseyServlet.setInitParameter("jersey.config.server.provider.classnames",
+		jerseyServlet.setInitParameter("resteasy.resources",
 				StringUtils.join(Arrays.asList(
 					TestJaxRsMockPatientRestProvider.class.getCanonicalName(),
-					JaxRsExceptionInterceptor.class.getCanonicalName(),
 					TestJaxRsConformanceRestProvider.class.getCanonicalName(),
 					TestJaxRsMockPageProvider.class.getCanonicalName()
-						), ";"));
+						), ","));
 		//@formatter:on
 
-		jettyServer.start();
+		JettyUtil.startServer(jettyServer);
+        ourPort = JettyUtil.getPortForStartedServer(jettyServer);
 
 		ourCtx.setRestfulClientFactory(new JaxRsRestfulClientFactory(ourCtx));
 		ourCtx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
@@ -421,15 +445,6 @@ public class AbstractJaxRsResourceProviderTest {
 		client = ourCtx.newRestfulGenericClient(serverBase);
 		client.setEncoding(EncodingEnum.JSON);
 		client.registerInterceptor(new LoggingInterceptor(true));
-	}
-
-	@AfterClass
-	public static void tearDownClass() throws Exception {
-		try {
-			jettyServer.destroy();
-		} catch (Exception e) {
-
-		}
 	}
 
 }
